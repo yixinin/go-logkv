@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	pb "github.com/Jille/raft-grpc-example/proto"
-	"github.com/Jille/raft-grpc-leader-rpc/rafterrors"
+	pb "logkv/proto"
+
 	"github.com/hashicorp/raft"
 )
 
@@ -85,7 +85,7 @@ type rpcInterface struct {
 func (r rpcInterface) AddWord(ctx context.Context, req *pb.AddWordRequest) (*pb.AddWordResponse, error) {
 	f := r.raft.Apply([]byte(req.GetWord()), time.Second)
 	if err := f.Error(); err != nil {
-		return nil, rafterrors.MarkRetriable(err)
+		return nil, err
 	}
 	return &pb.AddWordResponse{
 		CommitIndex: f.Index(),
