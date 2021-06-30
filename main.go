@@ -5,17 +5,14 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net"
+	"logkv/kv"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
-
-	pb "logkv/proto"
 
 	"github.com/hashicorp/raft"
 	boltdb "github.com/hashicorp/raft-boltdb"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 )
 
 var (
@@ -24,42 +21,26 @@ var (
 
 	raftDir       = flag.String("data_dir", "./data/", "Raft data dir")
 	raftBootstrap = flag.Bool("bootstrap", false, "Whether to bootstrap the Raft cluster")
-	peers         = flag.String("peers", "", "host:port")
+	peers         = flag.String("peers", "", "host:port,")
 )
 
 func main() {
 	flag.Parse()
 
+	var addrs = strings.Split(*peers, ",")
 	if *raftId == "" {
 		log.Fatalf("flag --raft_id is required")
 	}
 
 	ctx := context.Background()
-	_, port, err := net.SplitHostPort(*myAddr)
-	if err != nil {
-		log.Fatalf("failed to parse local address (%q): %v", *myAddr, err)
-	}
-	sock, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
 
-	wt := &wordTracker{}
-
-	r, err := NewRaft(ctx, *raftId, *myAddr, wt)
+	var engine = kv.NewKvEngine("")
+	r, err := NewRaft(ctx, *raftId, *myAddr, engine)
 	if err != nil {
 		log.Fatalf("failed to start raft: %v", err)
 	}
-	s := grpc.NewServer()
-	pb.RegisterExampleServer(s, &rpcInterface{
-		wordTracker: wt,
-		raft:        r,
-	})
-
-	reflection.Register(s)
-	if err := s.Serve(sock); err != nil {
-		log.Fatalf("failed to serve: %v", err)
-	}
+	s := NewServer(r, addrs)
+	s.Run(addrs)
 }
 
 func NewRaft(ctx context.Context, myID, myAddress string, fsm raft.FSM) (*raft.Raft, error) {
@@ -110,13 +91,4 @@ func NewRaft(ctx context.Context, myID, myAddress string, fsm raft.FSM) (*raft.R
 	}
 
 	return r, nil
-}
-
-func AddPeers(peers []string) {
-	if len(peers) == 0 {
-		return
-	}
-
-	var client = pb.NewExampleClient()
-	client.
 }

@@ -1,64 +1,157 @@
 package main
 
 import (
-	"context"
+	"fmt"
 	"log"
-	pb "logkv/proto"
+	"logkv/protocol"
+	"net"
 	"sync"
 	"time"
 
+	"github.com/davyxu/cellnet"
+	"github.com/davyxu/cellnet/peer"
+	"github.com/davyxu/cellnet/proc"
 	"github.com/hashicorp/raft"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/peer"
 )
 
 type Server struct {
 	sync.RWMutex
-	clients map[string]pb.PeerClient
-	conns   map[string]*grpc.ClientConn
-	raft    *raft.Raft
+	sessions map[string]cellnet.Session
+	raft     *raft.Raft
+	timeout  time.Duration
 }
 
-func (s *Server) GetClient(addr string) (pb.PeerClient, bool) {
+func NewServer(r *raft.Raft, addrs []string) *Server {
+	var s = &Server{
+		sessions: make(map[string]cellnet.Session, len(addrs)),
+		raft:     r,
+		timeout:  1 * time.Second,
+	}
+
+	return s
+}
+
+func (s *Server) Run(addrs []string) {
+	go s.InitPeers(addrs)
+	go s.Listen(8080)
+}
+
+func (s *Server) GetSession(addr string) (cellnet.Session, bool) {
 	s.RLock()
 	defer s.RUnlock()
-	c, ok := s.clients[addr]
+	c, ok := s.sessions[addr]
 	return c, ok
 }
-func (s *Server) AddClient(addr string) (bool, error) {
-	s.Lock()
-	defer s.Unlock()
-	_, ok := s.clients[addr]
-	if ok {
-		conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithBlock())
-		if err != nil {
-			return false, err
-		}
-		s.clients[addr] = pb.NewPeerClient(conn)
-		s.conns[addr] = conn
-		return true, nil
-	}
-	return ok, nil
-}
 
-func (s *Server) ClientFor(f func(pb.PeerClient)) {
-	s.RLock()
-	defer s.RUnlock()
-	for _, client := range s.clients {
-		go func(c pb.PeerClient) {
-			if r := recover(); r != nil {
-				log.Println(r)
+func (s *Server) Listen(port int16) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println(r)
+		}
+	}()
+	queue := cellnet.NewEventQueue()
+	peerIns := peer.NewGenericPeer("tcp.Acceptor", "server", fmt.Sprintf("0.0.0.0:%d", port), queue)
+	proc.BindProcessorHandler(peerIns, "tcp.ltv", func(ev cellnet.Event) {
+		switch msg := ev.Message().(type) {
+		case *cellnet.SessionAccepted:
+			if conn, ok := ev.Session().Raw().(net.Conn); ok {
+				addr := conn.RemoteAddr().String()
+				ok, err := s.AddSession(addr, ev.Session())
+				if err != nil {
+					log.Println(err)
+					return
+				}
+				if ok {
+					ev.Session().Close()
+				}
 			}
 
-			f(c)
-		}(client)
+		case *cellnet.SessionClosed:
+			if conn, ok := ev.Session().Raw().(net.Conn); ok {
+				addr := conn.RemoteAddr().String()
+				s.CloseSession(addr)
+			}
+		default:
+			s.Handle(ev.Session(), msg)
+		}
+	})
+	peerIns.Start()
+	queue.StartLoop().Wait()
+}
+
+func (s *Server) Connect(addr string) {
+	queue := cellnet.NewEventQueue()
+	peerIns := peer.NewGenericPeer("tcp.Acceptor", "client", addr, queue)
+	proc.BindProcessorHandler(peerIns, "tcp.ltv", func(ev cellnet.Event) {
+		switch msg := ev.Message().(type) {
+		case *cellnet.SessionConnected, *cellnet.SessionAccepted:
+			ok, err := s.AddSession(addr, ev.Session())
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			if ok {
+				ev.Session().Close()
+			}
+		case *cellnet.SessionClosed, *cellnet.SessionConnectError:
+			s.CloseSession(addr)
+		default:
+			s.Handle(ev.Session(), msg)
+		}
+	})
+	peerIns.Start()
+	queue.StartLoop().Wait()
+}
+
+func (s *Server) AddSession(addr string, sess cellnet.Session) (bool, error) {
+	s.Lock()
+	defer s.Unlock()
+	_, ok := s.sessions[addr]
+	if ok {
+		return ok, nil
+	}
+	s.sessions[addr] = sess
+	return false, nil
+}
+
+func (s *Server) CloseSession(addr string) {
+	s.Lock()
+	defer s.Unlock()
+	if sess, ok := s.sessions[addr]; ok {
+		sess.Close()
+	}
+	delete(s.sessions, addr)
+}
+
+func (s *Server) Foreach(f func(sess cellnet.Session)) {
+	s.RLock()
+	defer s.RUnlock()
+	for _, session := range s.sessions {
+		go func(sess cellnet.Session) {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Println(r)
+				}
+			}()
+			f(sess)
+		}(session)
 	}
 }
 
-func NewServer(addrs []string) *Server {
-	var s = &Server{}
-	go s.InitPeers(addrs)
-	return s
+func (s *Server) ForeachAddrs(addrs []string, f func(addr string, sess cellnet.Session)) {
+	s.RLock()
+	defer s.RUnlock()
+	for _, addr := range addrs {
+		go func(addr string, sess cellnet.Session) {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Println(r)
+				}
+			}()
+			f(addr, sess)
+		}(addr, s.sessions[addr])
+	}
+
 }
 
 func (s *Server) InitPeers(addrs []string) {
@@ -67,49 +160,106 @@ func (s *Server) InitPeers(addrs []string) {
 			log.Println(r)
 		}
 	}()
-	inited := false
-	for !inited {
-		inited = true
-		for _, addr := range addrs {
-			ok, err := s.AddClient(addr)
-			if err != nil {
-				log.Println("add client error", err)
-				continue
-			}
-			if !ok {
+	for {
+		var inited = true
+		s.ForeachAddrs(addrs, func(addr string, sess cellnet.Session) {
+			if sess == nil {
 				inited = false
+				s.Connect(addr)
 			}
+		})
+		if inited {
+			break
 		}
 	}
 }
 
-func (s *Server) AddPeer(ctx context.Context, req *pb.AddPeerReq) (*pb.AddPeerAck, error) {
-	p, ok := peer.FromContext(ctx)
-	if ok {
-		var addr = p.Addr.String()
-
-		if s.raft.State() == raft.Leader {
-			s.raft.AddPeer(raft.ServerAddress(addr))
-		} else {
-			s.raft.AddVoter(req.Id, raft.ServerAddress(addr), 0, time.Second)
+func (s *Server) Handle(sess cellnet.Session, msg interface{}) {
+	var resp interface{}
+	defer func() {
+		if resp != nil {
+			sess.Send(resp)
 		}
-
-		if _, ok := s.clients[addr]; !ok {
-			conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithBlock())
-			if err != nil {
-				log.Println("did not connect: %v", err)
-				return nil, err
-			}
-			s.Lock()
-			s.clients[addr] = pb.NewPeerClient(conn)
-			s.conns[addr] = conn
-			s.Unlock()
+	}()
+	switch msg := msg.(type) {
+	case *protocol.AddVoterReq:
+		ack := &protocol.AddVoterAck{}
+		resp = ack
+		f := s.raft.AddVoter(msg.ID, msg.ServerAddress, msg.PrevIndex, s.timeout)
+		if err := f.Error(); err != nil {
+			ack.Error = err
+			return
 		}
-	} else {
-		log.Println("get peer not ok")
+		ack.Index = f.Index()
+	case *protocol.AddNonvoterReq:
+		ack := &protocol.AddNonvoterAck{}
+		resp = ack
+		f := s.raft.AddNonvoter(msg.ID, msg.ServerAddress, msg.PrevIndex, s.timeout)
+		if err := f.Error(); err != nil {
+			ack.Error = err
+			return
+		}
+		ack.Index = f.Index()
+	case *protocol.AppliedIndexReq:
+		index := s.raft.AppliedIndex()
+		resp = &protocol.AppliedIndexAck{Index: index}
+	case *protocol.BarrierReq:
+		err := s.raft.Barrier(s.timeout).Error()
+		resp = &protocol.BarrierAck{Error: err}
+	case *protocol.DemoteVoterReq:
+		ack := &protocol.DemoteVoterAck{}
+		resp = ack
+		f := s.raft.DemoteVoter(msg.Id, msg.PreviousIndex, s.timeout)
+		if err := f.Error(); err != nil {
+			ack.Error = err
+			return
+		}
+		ack.Index = f.Index()
+	case *protocol.RemoveServerReq:
+		ack := &protocol.RemoveServerAck{}
+		resp = ack
+		f := s.raft.RemoveServer(msg.Id, msg.PreviousIndex, s.timeout)
+		if err := f.Error(); err != nil {
+			ack.Error = err
+			return
+		}
+		ack.Index = f.Index()
+	case *raft.Log:
+		ack := &protocol.ApplyLogAck{}
+		resp = ack
+		f := s.raft.ApplyLog(*msg, s.timeout)
+		if err := f.Error(); err != nil {
+			ack.Error = err
+			return
+		}
+		ack.Response = f.Response()
+		ack.Index = f.Index()
+	case *protocol.Kv:
+		ack := &protocol.ApplyAck{}
+		resp = ack
+		f := s.raft.Apply(msg.Bytes(), s.timeout)
+		if err := f.Error(); err != nil {
+			ack.Error = err
+			return
+		}
+		ack.Response = f.Response()
+	case *protocol.Kvs:
+		ack := &protocol.ApplyAck{}
+		resp = ack
+		f := s.raft.Apply(msg.Bytes(), time.Duration(len(*msg))*s.timeout)
+		if err := f.Error(); err != nil {
+			ack.Error = err
+			return
+		}
+		ack.Response = f.Response()
+	default:
+		s.HandleAck(sess, msg)
 	}
-	return nil, nil
 }
-func (s *Server) GetPeers(ctxx context.Context, req *pb.GetPeersReq) (*pb.GetPeersAck, error) {
-	return nil, nil
+
+func (s *Server) HandleAck(sess cellnet.Session, msg interface{}) {
+	switch msg := msg.(type) {
+	case protocol.AddNonvoterAck:
+		log.Println(msg)
+	}
 }
