@@ -62,8 +62,35 @@ func (e *KvEngine) BatchSet(kvs protocol.Kvs) error {
 }
 
 func (e *KvEngine) Get(index uint64) (protocol.Kv, error) {
-
-	return protocol.Kv{}, nil
+	offsets := e.indexer.Get("index", NewIndexKey(index))
+	var offset int64
+	if len(offsets) > 0 {
+		offset = offsets[0]
+	}
+	_, err := e.fd.Seek(int64(offset), 0)
+	if err != nil {
+		return protocol.Kv{}, err
+	}
+	var headerBuf = make([]byte, protocol.HeaderSize+protocol.KeySize)
+	_, err = e.fd.Read(headerBuf)
+	if err != nil {
+		return protocol.Kv{}, err
+	}
+	key, err := protocol.BytesToIntU(headerBuf[protocol.HeaderSize:])
+	if err != nil {
+		return protocol.Kv{}, err
+	}
+	dataSize, err := protocol.BytesToIntU(headerBuf[:protocol.HeaderSize])
+	if err != nil {
+		return protocol.Kv{}, err
+	}
+	var data = make([]byte, dataSize)
+	_, err = e.fd.Read(data)
+	if err != nil {
+		return protocol.Kv{}, err
+	}
+	kv := protocol.NewKv(key, data)
+	return kv, nil
 }
 
 func (e *KvEngine) BatchGet(indexs []uint64) (protocol.Kvs, error) {
