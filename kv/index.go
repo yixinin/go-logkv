@@ -1,6 +1,9 @@
 package kv
 
-import "sync"
+import (
+	"logkv/index"
+	"sync"
+)
 
 type KvIndexer struct {
 	sync.RWMutex
@@ -12,7 +15,7 @@ func NewKvIndexer() *KvIndexer {
 		i: make(map[string]*Index, 1),
 	}
 }
-func (i *KvIndexer) Get(name string, key IndexKey) []int64 {
+func (i *KvIndexer) Get(name string, key index.IndexVal) []int64 {
 	i.RLock()
 	index, ok := i.i[name]
 	i.RUnlock()
@@ -21,7 +24,7 @@ func (i *KvIndexer) Get(name string, key IndexKey) []int64 {
 	}
 	return nil
 }
-func (i *KvIndexer) Set(name string, key IndexKey, offset int64) {
+func (i *KvIndexer) Set(name string, key index.IndexVal, offset int64) {
 	i.Lock()
 	index, ok := i.i[name]
 	if !ok {
@@ -34,16 +37,16 @@ func (i *KvIndexer) Set(name string, key IndexKey, offset int64) {
 
 type Index struct {
 	sync.RWMutex
-	i map[IndexKey][]int64
+	i map[index.IndexVal][]int64
 }
 
 func NewIndex() *Index {
 	return &Index{
-		i: make(map[IndexKey][]int64),
+		i: make(map[index.IndexVal][]int64),
 	}
 }
 
-func (i *Index) Set(key IndexKey, offset int64) {
+func (i *Index) Set(key index.IndexVal, offset int64) {
 	i.Lock()
 	defer i.Unlock()
 	if _, ok := i.i[key]; ok {
@@ -51,7 +54,7 @@ func (i *Index) Set(key IndexKey, offset int64) {
 	}
 	i.i[key] = []int64{offset}
 }
-func (i *Index) Get(key IndexKey) []int64 {
+func (i *Index) Get(key index.IndexVal) []int64 {
 	i.RLock()
 	defer i.RUnlock()
 	return i.i[key]

@@ -2,11 +2,11 @@ package kv
 
 import (
 	"io"
+	bytesutils "logkv/bytes-utils"
+	"logkv/index"
 	"logkv/protocol"
 	"os"
 	"sync"
-
-	"github.com/hashicorp/raft"
 )
 
 type EngineMeta struct {
@@ -38,31 +38,38 @@ func NewKvEngine(filename string) *KvEngine {
 func (e *KvEngine) Set(kv protocol.Kv) error {
 	e.Lock()
 	defer e.Unlock()
-	_, err := e.fd.Write(kv.Bytes())
-	return err
-}
-
-func (e *KvEngine) RawSet(data []byte) error {
-	e.Lock()
-	defer e.Unlock()
-	_, err := e.fd.Write(data)
-	return err
-}
-
-func (e *KvEngine) rawDataSet(data []byte) error {
-	_, err := e.fd.Write(data)
-	return err
+	var offset int64
+	stat, err := e.fd.Stat()
+	if err != nil {
+		return err
+	}
+	offset = stat.Size()
+	_, err = e.fd.Write(kv.Bytes())
+	if err != nil {
+		return err
+	}
+	var indexes = make(map[string]index.IndexVal, len(kv.Indexes))
+	indexes["index"] = index.NewIndexVal(kv.Key)
+	for k, v := range kv.Indexes {
+		indexes[k] = index.NewIndexVal(v)
+	}
+	for k, v := range indexes {
+		e.indexer.Set(k, v, offset)
+	}
+	return nil
 }
 
 func (e *KvEngine) BatchSet(kvs protocol.Kvs) error {
-	e.Lock()
-	defer e.Unlock()
-	_, err := e.fd.Write(kvs.Bytes())
-	return err
+	for _, v := range kvs {
+		if err := e.Set(v); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func (e *KvEngine) Get(index uint64) (protocol.Kv, error) {
-	offsets := e.indexer.Get("index", NewIndexKey(index))
+func (e *KvEngine) Get(i uint64) (protocol.Kv, error) {
+	offsets := e.indexer.Get("index", index.NewIndexVal(i))
 	var offset int64
 	if len(offsets) > 0 {
 		offset = offsets[0]
@@ -76,11 +83,11 @@ func (e *KvEngine) Get(index uint64) (protocol.Kv, error) {
 	if err != nil {
 		return protocol.Kv{}, err
 	}
-	key, err := protocol.BytesToIntU(headerBuf[protocol.HeaderSize:])
+	key, err := bytesutils.BytesToIntU(headerBuf[protocol.HeaderSize:])
 	if err != nil {
 		return protocol.Kv{}, err
 	}
-	dataSize, err := protocol.BytesToIntU(headerBuf[:protocol.HeaderSize])
+	dataSize, err := bytesutils.BytesToIntU(headerBuf[:protocol.HeaderSize])
 	if err != nil {
 		return protocol.Kv{}, err
 	}
@@ -93,9 +100,16 @@ func (e *KvEngine) Get(index uint64) (protocol.Kv, error) {
 	return kv, nil
 }
 
-func (e *KvEngine) BatchGet(indexs []uint64) (protocol.Kvs, error) {
-
-	return nil, nil
+func (e *KvEngine) BatchGet(indexes []uint64) (protocol.Kvs, error) {
+	var kvs = make(protocol.Kvs, 0, len(indexes))
+	for _, index := range indexes {
+		kv, err := e.Get(index)
+		if err != nil {
+			return kvs, err
+		}
+		kvs = append(kvs, kv)
+	}
+	return kvs, nil
 }
 
 func (e *KvEngine) Scan(startIndex, endIndex uint64, limits ...int) (protocol.Kvs, error) {
@@ -110,46 +124,4 @@ func (e *KvEngine) Scan(startIndex, endIndex uint64, limits ...int) (protocol.Kv
 
 func (e *KvEngine) rawReader() (io.ReadCloser, error) {
 	return os.OpenFile(e.meta.filename, os.O_RDONLY, os.ModePerm)
-}
-
-func (e *KvEngine) Apply(log *raft.Log) interface{} {
-
-	e.RawSet(log.Data)
-	return nil
-}
-
-// Snapshot is used to support log compaction. This call should
-// return an FSMSnapshot which can be used to save a point-in-time
-// snapshot of the FSM. Apply and Snapshot are not called in multiple
-// threads, but Apply will be called concurrently with Persist. This means
-// the FSM should be implemented in a fashion that allows for concurrent
-// updates while a snapshot is happening.
-func (e *KvEngine) Snapshot() (raft.FSMSnapshot, error) {
-	var r, err = e.rawReader()
-	if err != nil {
-		return nil, err
-	}
-	return &snapshot{r}, nil
-}
-
-// Restore is used to restore an FSM from a snapshot. It is not called
-// concurrently with any other command. The FSM must discard all previous
-// state.
-func (e *KvEngine) Restore(r io.ReadCloser) error {
-	e.Lock()
-	defer e.Unlock()
-	var buf = make([]byte, 1024*1024)
-	for {
-		n, err := r.Read(buf)
-		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			return err
-		}
-		err = e.rawDataSet(buf[:n])
-		if err != nil {
-			return err
-		}
-	}
 }

@@ -1,18 +1,19 @@
-package kv
+package index
 
 import (
 	"fmt"
+	bytesutils "logkv/bytes-utils"
 	"reflect"
 	"strconv"
 )
 
-type IndexKey struct {
+type IndexVal struct {
 	stringVal *string
 	intVal    *int
 	floatVal  *float64
 }
 
-func NewIndexKey(val interface{}) IndexKey {
+func NewIndexVal(val interface{}) IndexVal {
 	var stringVal string
 	var intVal int
 	var floatVal float64
@@ -48,7 +49,7 @@ func NewIndexKey(val interface{}) IndexKey {
 			floatVal, _ = strconv.ParseFloat(fmt.Sprintf("%f", val), 64)
 		}
 	}
-	var k = IndexKey{}
+	var k = IndexVal{}
 	if stringVal != "" {
 		k.stringVal = &stringVal
 	}
@@ -61,13 +62,13 @@ func NewIndexKey(val interface{}) IndexKey {
 	return k
 }
 
-func (k IndexKey) String() string {
+func (k IndexVal) String() string {
 	if k.stringVal != nil {
 		return *k.stringVal
 	}
 	return ""
 }
-func (k IndexKey) Key() string {
+func (k IndexVal) Val() string {
 	if k.String() != "" {
 		return k.String()
 	}
@@ -79,15 +80,53 @@ func (k IndexKey) Key() string {
 	}
 	return ""
 }
-func (k IndexKey) Int() int {
+func (k IndexVal) Int() int {
 	if k.stringVal != nil {
 		return *k.intVal
 	}
 	return 0
 }
-func (k IndexKey) Float() float64 {
+func (k IndexVal) Float() float64 {
 	if k.floatVal != nil {
 		return *k.floatVal
 	}
 	return 0
+}
+
+func (k IndexVal) Size() int {
+	if k.String() != "" {
+		return len(k.String())
+	}
+	if k.Int() != 0 {
+		return 8
+	}
+	if k.Float() != 0 {
+		return 8
+	}
+	return 0
+}
+
+func (k IndexVal) Type() byte {
+	if k.String() != "" {
+		return 1
+	}
+	if k.Int() != 0 {
+		return 2
+	}
+	if k.Float() != 0 {
+		return 3
+	}
+	return 0
+}
+func (k IndexVal) Bytes() []byte {
+	if k.String() != "" {
+		return []byte(k.String())
+	}
+	if k.Int() != 0 {
+		return bytesutils.IntToBytes(k.Int(), 8)
+	}
+	if k.Float() != 0 {
+		return bytesutils.IntToBytes(int(k.Float()), 8)
+	}
+	return nil
 }
