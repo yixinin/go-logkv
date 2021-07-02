@@ -1,6 +1,7 @@
 package kv
 
 import (
+	"bytes"
 	"io"
 	bytesutils "logkv/bytes-utils"
 	"logkv/index"
@@ -122,6 +123,15 @@ func (e *KvEngine) Scan(startIndex, endIndex uint64, limits ...int) (protocol.Kv
 	return kvs, nil
 }
 
-func (e *KvEngine) rawReader() (io.ReadCloser, error) {
-	return os.OpenFile(e.meta.filename, os.O_RDONLY, os.ModePerm)
+func (e *KvEngine) rawFileReader() (io.Reader, error) {
+	var reader bytes.Buffer
+	f, err := os.OpenFile(e.meta.filename, os.O_RDONLY, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+	_, err = io.Copy(&reader, f)
+	if err != nil {
+		return nil, err
+	}
+	return &reader, nil
 }

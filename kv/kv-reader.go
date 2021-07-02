@@ -6,9 +6,9 @@ import (
 	"logkv/protocol"
 )
 
-func Read(r io.Reader, f func(kv protocol.Kv)) error {
+func ReadSnapshots(r io.Reader, f func(kv protocol.Kv)) error {
 	for {
-		kv, err := ReadKv(r)
+		kv, err := ReadSnapshot(r)
 		if err != nil {
 			if err == io.EOF {
 				return nil
@@ -19,7 +19,7 @@ func Read(r io.Reader, f func(kv protocol.Kv)) error {
 	}
 }
 
-func ReadKv(r io.Reader) (protocol.Kv, error) {
+func ReadSnapshot(r io.Reader) (protocol.Kv, error) {
 	var headerBuf = make([]byte, protocol.HeaderSize+protocol.KeySize)
 	_, err := r.Read(headerBuf)
 	if err != nil {

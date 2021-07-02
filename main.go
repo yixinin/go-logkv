@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"logkv/kv"
+	"logkv/server"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,12 +35,12 @@ func main() {
 
 	ctx := context.Background()
 
-	var engine = kv.NewKvEngine("")
+	var engine = kv.NewKvEngine("log.kv")
 	r, err := NewRaft(ctx, *raftId, *myAddr, engine)
 	if err != nil {
 		log.Fatalf("failed to start raft: %v", err)
 	}
-	s := NewServer(r, addrs)
+	s := server.NewServer(r, engine)
 	s.Run(addrs)
 }
 

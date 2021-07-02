@@ -8,7 +8,7 @@ import (
 )
 
 type snapshot struct {
-	r io.ReadCloser
+	r io.Reader
 }
 
 func (s *snapshot) Persist(sink raft.SnapshotSink) error {
@@ -35,7 +35,5 @@ func (s *snapshot) Persist(sink raft.SnapshotSink) error {
 }
 
 func (s *snapshot) Release() {
-	if s.r != nil {
-		s.r.Close()
-	}
+
 }

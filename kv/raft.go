@@ -8,7 +8,10 @@ import (
 )
 
 func (e *KvEngine) Apply(log *raft.Log) interface{} {
-	var kv = protocol.NewKv(log.Index, log.Data)
+	var kv, err = protocol.NewKvWithIndexes(log.Index, log.Data)
+	if err != nil {
+		return err
+	}
 	return e.Set(kv)
 }
 
@@ -19,7 +22,7 @@ func (e *KvEngine) Apply(log *raft.Log) interface{} {
 // the FSM should be implemented in a fashion that allows for concurrent
 // updates while a snapshot is happening.
 func (e *KvEngine) Snapshot() (raft.FSMSnapshot, error) {
-	var r, err = e.rawReader()
+	r, err := e.rawFileReader()
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +42,7 @@ func (e *KvEngine) Restore(r io.ReadCloser) error {
 		return err
 	}
 
-	err := Read(r, func(kv protocol.Kv) {
+	err := ReadSnapshots(r, func(kv protocol.Kv) {
 		err := e.Set(kv)
 		if err != nil {
 			panic(err)
