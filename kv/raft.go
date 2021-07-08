@@ -26,7 +26,11 @@ func (e *KvEngine) Snapshot() (raft.FSMSnapshot, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &snapshot{r}, nil
+
+	return &snapshot{
+		r: r,
+		i: e.indexer.Clone(),
+	}, nil
 }
 
 // Restore is used to restore an FSM from a snapshot. It is not called
@@ -42,11 +46,17 @@ func (e *KvEngine) Restore(r io.ReadCloser) error {
 		return err
 	}
 
-	err := ReadSnapshots(r, func(kv protocol.Kv) {
+	var set = func(kv protocol.Kv) {
 		err := e.Set(kv)
 		if err != nil {
 			panic(err)
 		}
-	})
+	}
+
+	var setIndex = func(i map[string]*Index) {
+		e.indexer.i = i
+	}
+
+	err := ReadSnapshots(r, set, setIndex)
 	return err
 }

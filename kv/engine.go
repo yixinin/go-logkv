@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"io"
 	bytesutils "logkv/bytes-utils"
-	"logkv/index"
 	"logkv/protocol"
 	"os"
+	"strconv"
 	"sync"
 )
 
@@ -49,10 +49,10 @@ func (e *KvEngine) Set(kv protocol.Kv) error {
 	if err != nil {
 		return err
 	}
-	var indexes = make(map[string]index.IndexVal, len(kv.Indexes))
-	indexes["index"] = index.NewIndexVal(kv.Key)
+	var indexes = make(map[string]string, len(kv.Indexes))
+	indexes["index"] = strconv.FormatUint(kv.Key, 10)
 	for k, v := range kv.Indexes {
-		indexes[k] = index.NewIndexVal(v)
+		indexes[k] = v
 	}
 	for k, v := range indexes {
 		e.indexer.Set(k, v, offset)
@@ -70,7 +70,7 @@ func (e *KvEngine) BatchSet(kvs protocol.Kvs) error {
 }
 
 func (e *KvEngine) Get(i uint64) (protocol.Kv, error) {
-	offsets := e.indexer.Get("index", index.NewIndexVal(i))
+	offsets := e.indexer.Get("index", strconv.FormatUint(i, 10))
 	var offset int64
 	if len(offsets) > 0 {
 		offset = offsets[0]
