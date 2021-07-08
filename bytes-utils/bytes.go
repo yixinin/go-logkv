@@ -53,7 +53,7 @@ func BytesToFloat(b []byte) (float64, error) {
 	}
 }
 
-func IntToBytes(n int, b byte) []byte {
+func UintToBytes(n uint64, b byte) []byte {
 	switch b {
 	case 1:
 		tmp := int8(n)

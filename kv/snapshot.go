@@ -24,7 +24,7 @@ func (s *snapshot) Persist(sink raft.SnapshotSink) error {
 		return err
 	}
 	var indexSize = len(indexBuf)
-	n, err := sink.Write(bytesutils.IntToBytes(indexSize, 8))
+	n, err := sink.Write(bytesutils.UintToBytes(uint64(indexSize), 8))
 	if err != nil {
 		return err
 	}

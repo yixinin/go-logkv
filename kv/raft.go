@@ -8,7 +8,11 @@ import (
 )
 
 func (e *KvEngine) Apply(log *raft.Log) interface{} {
-	var kv, err = protocol.NewKvWithIndexes(log.Index, log.Data)
+	if len(log.Data) == 0 {
+		return nil
+	}
+	kv, err := protocol.NewKvWithIndexes(log.Index, log.Data)
+
 	if err != nil {
 		return err
 	}
