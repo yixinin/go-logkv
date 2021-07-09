@@ -57,10 +57,8 @@ func (e *KvEngine) Restore(r io.ReadCloser) error {
 		}
 	}
 
-	var setIndex = func(i map[string]*Index) {
-		e.indexer.i = i
-	}
+	 
 
-	err := ReadSnapshots(r, set, setIndex)
+	err := ReadSnapshots(r, set)
 	return err
 }
