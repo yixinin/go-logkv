@@ -62,3 +62,12 @@ type ScanWithIndexReq struct {
 type ScanWithIndexAck struct {
 	Datas []GetAck
 }
+
+type DeleteReq struct {
+	Index uint64
+	Time  uint64
+}
+
+type DeleteAck struct {
+	Deleted uint64
+}

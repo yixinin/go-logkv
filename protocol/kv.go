@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	bytesutils "logkv/bytes-utils"
+	"logkv/kvid"
 )
 
 const (
@@ -12,16 +13,14 @@ const (
 )
 
 type Kv struct {
-	Key     uint64
-	Data    []byte
-	Indexes map[string]string
+	Key  kvid.Id
+	Data []byte
 }
 
-func NewKv(key uint64, data []byte) Kv {
+func NewKv(key [12]byte, data []byte) Kv {
 	var kv = Kv{
-		Key:     key,
-		Data:    data,
-		Indexes: make(map[string]string),
+		Key:  key,
+		Data: data,
 	}
 	return kv
 }

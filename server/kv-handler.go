@@ -12,6 +12,7 @@ import (
 func (s *Server) Handle(sess cellnet.Session, msg interface{}) {
 	switch msg := msg.(type) {
 	case *protocol.SetReq:
+
 		indexBuf, err := json.Marshal(msg.Indexes)
 		if err != nil {
 			log.Println(err)

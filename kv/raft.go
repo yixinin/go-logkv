@@ -11,8 +11,8 @@ func (e *KvEngine) Apply(log *raft.Log) interface{} {
 	if len(log.Data) == 0 {
 		return nil
 	}
-	kv, err := protocol.NewKvWithIndexes(log.Index, log.Data)
 
+	kv, err := protocol.NewKvWithIndexes(log.Index, log.Data)
 	if err != nil {
 		return err
 	}
@@ -56,8 +56,6 @@ func (e *KvEngine) Restore(r io.ReadCloser) error {
 			panic(err)
 		}
 	}
-
-	 
 
 	err := ReadSnapshots(r, set)
 	return err

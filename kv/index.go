@@ -6,21 +6,23 @@ import (
 
 type KvIndexer struct {
 	sync.RWMutex
-	i map[string]*Index
+	i map[uint32]map[uint64]int64
 }
 
 func NewKvIndexer() *KvIndexer {
 	return &KvIndexer{
-		i: make(map[string]*Index, 1),
+		i: make(map[uint32]map[uint64]int64),
 	}
 }
 func (i *KvIndexer) Get(name string, key string) []int64 {
 	i.RLock()
-	index, ok := i.i[name]
+	index, ok := i.i.GetValue(key)
+
 	i.RUnlock()
 	if ok {
 		return index.Get(key)
 	}
+
 	return nil
 }
 func (i *KvIndexer) Set(name string, key string, offset int64) {
