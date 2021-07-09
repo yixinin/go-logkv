@@ -9,7 +9,7 @@ import (
 
 type snapshot struct {
 	r io.Reader
-	i map[string]map[string][]int64
+	i map[string]int64
 }
 
 func (s *snapshot) Persist(sink raft.SnapshotSink) error {

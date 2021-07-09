@@ -3,6 +3,7 @@ package kv
 import (
 	"io"
 	"logkv/protocol"
+	"time"
 
 	"github.com/hashicorp/raft"
 )
@@ -12,10 +13,8 @@ func (e *KvEngine) Apply(log *raft.Log) interface{} {
 		return nil
 	}
 
-	kv, err := protocol.NewKvWithIndexes(log.Index, log.Data)
-	if err != nil {
-		return err
-	}
+	kv := protocol.NewKv(uint32(time.Now().Unix()), log.Index, log.Data)
+
 	return e.Set(kv)
 }
 

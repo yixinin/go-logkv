@@ -4,15 +4,13 @@ import (
 	"encoding/hex"
 	"errors"
 	bytesutils "logkv/bytes-utils"
-	"time"
 )
 
 var IdErr = errors.New("not a valid kvid")
 
 type Id [12]byte
 
-func NewId(index uint64) Id {
-	var ts = time.Now().Unix()
+func NewId(ts uint32, index uint64) Id {
 	var id = Id{}
 	copy(id[:4], bytesutils.UintToBytes(uint64(ts), 4))
 	copy(id[4:], bytesutils.UintToBytes(index, 8))
@@ -29,6 +27,16 @@ func (id Id) Meta() (uint32, uint64) {
 	return uint32(ts), index
 }
 
+func (id Id) Ts() uint32 {
+	ts, _ := bytesutils.BytesToIntU(id[:4])
+	return uint32(ts)
+}
+
+func (id Id) Index() uint64 {
+	index, _ := bytesutils.BytesToIntU(id[4:])
+	return index
+}
+
 func FromHex(s string) (Id, error) {
 	if len(s) != 24 {
 		return [12]byte{}, IdErr
@@ -43,4 +51,14 @@ func FromHex(s string) (Id, error) {
 	var id = [12]byte{}
 	copy(id[:], bs)
 	return id, nil
+}
+
+func FromBytes(buf []byte) Id {
+	var id = Id{}
+	copy(id[:], buf)
+	return id
+}
+
+func TsHex(ts uint32) string {
+	return hex.EncodeToString(bytesutils.UintToBytes(uint64(ts), 4))
 }

@@ -44,7 +44,7 @@ func ReadSnapshot(r io.Reader) (int, protocol.Kv, error) {
 	if err != nil {
 		return n + n1, protocol.Kv{}, err
 	}
-	kv := protocol.NewKv(key, data)
+	kv := protocol.KvFromKv(key, data)
 	var indexBuf = make([]byte, indexSize)
 	n2, err := r.Read(indexBuf)
 	if err != nil {

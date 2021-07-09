@@ -2,7 +2,6 @@ package kv
 
 import (
 	"logkv/protocol"
-	"strconv"
 )
 
 func (e *KvEngine) Set(kv protocol.Kv) error {
@@ -18,14 +17,7 @@ func (e *KvEngine) Set(kv protocol.Kv) error {
 	if err != nil {
 		return err
 	}
-	var indexes = make(map[string]string, len(kv.Indexes))
-	indexes["index"] = strconv.FormatUint(kv.Key, 10)
-	for k, v := range kv.Indexes {
-		indexes[k] = v
-	}
-	for k, v := range indexes {
-		e.indexer.Set(k, v, offset)
-	}
+	e.indexer.Set(kv.Key, offset)
 	return nil
 }
 
