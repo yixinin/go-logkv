@@ -62,3 +62,7 @@ func FromBytes(buf []byte) Id {
 func TsHex(ts uint32) string {
 	return hex.EncodeToString(bytesutils.UintToBytes(uint64(ts), 4))
 }
+
+func ToHex(b []byte) string {
+	return hex.EncodeToString(b)
+}

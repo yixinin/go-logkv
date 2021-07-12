@@ -4,20 +4,16 @@ import (
 	"errors"
 	"io"
 	bytesutils "logkv/bytes-utils"
+	"logkv/kvid"
 	"logkv/protocol"
-	"strconv"
 )
 
 var (
 	ErrNotFound = errors.New("not found")
 )
 
-func (e *KvEngine) Get(i uint64) (protocol.Kv, error) {
-	offsets := e.indexer.Get("index", strconv.FormatUint(i, 10))
-	var offset int64 = -1
-	if len(offsets) > 0 {
-		offset = offsets[0]
-	}
+func (e *KvEngine) Get(id kvid.Id) (protocol.Kv, error) {
+	offset, _ := e.indexer.Get(id)
 	return e.get(offset)
 }
 
@@ -29,7 +25,7 @@ func (e *KvEngine) get(offset int64) (protocol.Kv, error) {
 	if err != nil {
 		return protocol.Kv{}, err
 	}
-	var headerBuf = make([]byte, protocol.HeaderSize*2+protocol.KeySize)
+	var headerBuf = make([]byte, protocol.HeaderSize+protocol.KeySize)
 	_, err = e.fd.Read(headerBuf)
 	if err != nil {
 		return protocol.Kv{}, err
@@ -39,11 +35,7 @@ func (e *KvEngine) get(offset int64) (protocol.Kv, error) {
 	if err != nil {
 		return protocol.Kv{}, err
 	}
-	// indexSize, err := bytesutils.BytesToIntU(headerBuf[protocol.HeaderSize : protocol.HeaderSize*2])
-	// if err != nil {
-	// 	return protocol.Kv{}, err
-	// }
-	key, err := bytesutils.BytesToIntU(headerBuf[protocol.HeaderSize*2:])
+	key := kvid.FromBytes(headerBuf[protocol.HeaderSize:])
 	if err != nil {
 		return protocol.Kv{}, err
 	}
@@ -52,11 +44,11 @@ func (e *KvEngine) get(offset int64) (protocol.Kv, error) {
 	if err != nil {
 		return protocol.Kv{}, err
 	}
-	kv := protocol.NewKv(key, data)
+	kv := protocol.KvFromKv(key, data)
 	return kv, nil
 }
 
-func (e *KvEngine) BatchGet(indexes []uint64) (protocol.Kvs, error) {
+func (e *KvEngine) BatchGet(indexes []kvid.Id) (protocol.Kvs, error) {
 	var kvs = make(protocol.Kvs, 0, len(indexes))
 	for _, index := range indexes {
 		kv, err := e.Get(index)
@@ -68,20 +60,17 @@ func (e *KvEngine) BatchGet(indexes []uint64) (protocol.Kvs, error) {
 	return kvs, nil
 }
 
-func (e *KvEngine) Scan(startIndex, endIndex uint64, limits ...int) (protocol.Kvs, error) {
+func (e *KvEngine) Scan(startIndex, endIndex kvid.Id, limits ...int) (protocol.Kvs, error) {
 	var limit = 10 * 1000
 	if len(limits) > 0 {
 		limit = limits[0]
 	}
-	offsets := e.indexer.Get("index", strconv.FormatUint(startIndex, 10))
-	var offset int64 = -1
-	if len(offsets) > 0 {
-		offset = offsets[0]
-	}
+	offset, _ := e.indexer.GetMin(startIndex)
+
 	return e.scan(offset, limit, endIndex, -1)
 }
 
-func (e *KvEngine) scan(offset int64, limit int, endIndex uint64, max int) (protocol.Kvs, error) {
+func (e *KvEngine) scan(offset int64, limit int, endIndex kvid.Id, max int) (protocol.Kvs, error) {
 	if offset == -1 {
 		return nil, ErrNotFound
 	}
@@ -90,10 +79,11 @@ func (e *KvEngine) scan(offset int64, limit int, endIndex uint64, max int) (prot
 		return nil, err
 	}
 
+	var endKey = endIndex.Hex()
 	var readSize = 0
 	var kvs = make(protocol.Kvs, 10)
 	for i := 0; i < limit; i++ {
-		n, kv, err := ReadSnapshot(e.fd)
+		n, kv, err := ReadKv(e.fd)
 		if err != nil {
 			if err == io.EOF {
 				return kvs, nil
@@ -104,11 +94,12 @@ func (e *KvEngine) scan(offset int64, limit int, endIndex uint64, max int) (prot
 			return kvs, nil
 		}
 
-		if endIndex > 0 && kv.Key > endIndex {
+		var key = kv.Key.Hex()
+		if endKey > "" && key > endKey {
 			return kvs, nil
 		}
 		kvs = append(kvs, kv)
-		if endIndex > 0 && kv.Key == endIndex {
+		if endKey > "" && key == endKey {
 			return kvs, nil
 		}
 		readSize += n
@@ -117,39 +108,4 @@ func (e *KvEngine) scan(offset int64, limit int, endIndex uint64, max int) (prot
 		}
 	}
 	return kvs, nil
-}
-
-func (e *KvEngine) GetWithIndex(name string, val string) (protocol.Kvs, error) {
-	offsets := e.indexer.Get(name, val)
-	if len(offsets) == 0 {
-		return protocol.Kvs{}, ErrNotFound
-	}
-	var kvs = make(protocol.Kvs, 0, len(offsets))
-	for _, v := range offsets {
-		kv, err := e.get(v)
-		if err != nil {
-			return kvs, err
-		}
-		kvs = append(kvs, kv)
-	}
-	return kvs, nil
-}
-
-func (e *KvEngine) ScanIndex(name string, startVal, endVal string, limits ...int) (protocol.Kvs, error) {
-	var limit = 10 * 1000
-	if len(limits) > 0 {
-		limit = limits[0]
-	}
-	offsets := e.indexer.Get(name, startVal)
-	var offset int64 = -1
-	for _, v := range offsets {
-		offset = v
-		break
-	}
-	endOffsets := e.indexer.Get(name, endVal)
-	var endOffset int64 = -1
-	for _, v := range endOffsets {
-		endOffset = v
-	}
-	return e.scan(offset, limit, 0, int(endOffset))
 }

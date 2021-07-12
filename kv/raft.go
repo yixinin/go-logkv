@@ -56,6 +56,6 @@ func (e *KvEngine) Restore(r io.ReadCloser) error {
 		}
 	}
 
-	err := ReadSnapshots(r, set)
+	err := ReadKvs(r, set)
 	return err
 }

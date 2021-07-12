@@ -32,25 +32,34 @@ func (i *KvIndexer) Get(id kvid.Id) (int64, bool) {
 	return node.Val(), true
 }
 
-func (i *KvIndexer) GetMin(ts uint32) (offset int64, ok bool) {
+func (i *KvIndexer) GetMin(key kvid.Id) (offset int64, ok bool) {
 	i.RLock()
 	defer i.RUnlock()
 	node := i.i.FirstInRange(skipmap.Range{
-		Min: kvid.TsHex(ts),
+		Min: key.Hex(),
 		Max: kvid.TsHex(math.MaxUint32),
 	})
+
 	if node == nil {
 		return -1, false
 	}
 	return node.Val(), true
 }
 
-func (i *KvIndexer) GetMax(ts uint32) (offset int64, ok bool) {
+func (i *KvIndexer) GetMax(key kvid.Id) (offset int64, ok bool) {
 	i.RLock()
 	defer i.RUnlock()
+
+	var max kvid.Id
+	if key.Index() == 0 {
+		max = kvid.NewId(key.Ts()+1, 0)
+	} else {
+		max = kvid.NewId(key.Ts(), key.Index()+1)
+	}
+
 	node := i.i.LastInRange(skipmap.Range{
-		Min:        kvid.TsHex(ts),
-		Max:        kvid.TsHex(ts + 1),
+		Min:        key.Hex(),
+		Max:        max.Hex(),
 		ExcludeMax: true,
 	})
 	if node == nil {

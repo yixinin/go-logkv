@@ -1,15 +1,15 @@
 package kv
 
 import (
-	"encoding/json"
 	"io"
 	bytesutils "logkv/bytes-utils"
+	"logkv/kvid"
 	"logkv/protocol"
 )
 
-func ReadSnapshots(r io.Reader, set func(kv protocol.Kv)) error {
+func ReadKvs(r io.Reader, set func(kv protocol.Kv)) error {
 	for {
-		_, kv, err := ReadSnapshot(r)
+		_, kv, err := ReadKv(r)
 		if err != nil {
 			if err == io.EOF {
 				return nil
@@ -20,8 +20,8 @@ func ReadSnapshots(r io.Reader, set func(kv protocol.Kv)) error {
 	}
 }
 
-func ReadSnapshot(r io.Reader) (int, protocol.Kv, error) {
-	var headerBuf = make([]byte, protocol.HeaderSize*2+protocol.KeySize)
+func ReadKv(r io.Reader) (int, protocol.Kv, error) {
+	var headerBuf = make([]byte, protocol.HeaderSize+protocol.KeySize)
 	n, err := r.Read(headerBuf)
 	if err != nil {
 		return n, protocol.Kv{}, err
@@ -30,14 +30,8 @@ func ReadSnapshot(r io.Reader) (int, protocol.Kv, error) {
 	if err != nil {
 		return n, protocol.Kv{}, err
 	}
-	indexSize, err := bytesutils.BytesToIntU(headerBuf[protocol.HeaderSize : protocol.HeaderSize*2])
-	if err != nil {
-		return n, protocol.Kv{}, err
-	}
-	key, err := bytesutils.BytesToIntU(headerBuf[protocol.HeaderSize*2:])
-	if err != nil {
-		return n, protocol.Kv{}, err
-	}
+
+	key := kvid.FromBytes(headerBuf[protocol.HeaderSize:])
 
 	var data = make([]byte, dataSize)
 	n1, err := r.Read(data)
@@ -45,11 +39,6 @@ func ReadSnapshot(r io.Reader) (int, protocol.Kv, error) {
 		return n + n1, protocol.Kv{}, err
 	}
 	kv := protocol.KvFromKv(key, data)
-	var indexBuf = make([]byte, indexSize)
-	n2, err := r.Read(indexBuf)
-	if err != nil {
-		return n + n1 + n2, protocol.Kv{}, err
-	}
-	err = json.Unmarshal(indexBuf, &kv.Indexes)
-	return n + n1 + n2, kv, err
+
+	return n + n1, kv, err
 }
