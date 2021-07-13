@@ -2,22 +2,22 @@ package protocol
 
 import "github.com/hashicorp/raft"
 
-type AddVoterReq struct {
-	ID            raft.ServerID
-	ServerAddress raft.ServerAddress
-	PrevIndex     uint64
-}
-type AddVoterAck struct {
-	Index uint64
-	Error error
-}
-
 type AddNonvoterReq struct {
 	ID            raft.ServerID
 	ServerAddress raft.ServerAddress
 	PrevIndex     uint64
 }
 type AddNonvoterAck struct {
+	Index uint64
+	Error error
+}
+
+type AddVoterReq struct {
+	ID            raft.ServerID
+	ServerAddress raft.ServerAddress
+	PrevIndex     uint64
+}
+type AddVoterAck struct {
 	Index uint64
 	Error error
 }

@@ -1,8 +1,7 @@
 package protocol
 
 type SetReq struct {
-	Data    []byte
-	Indexes map[string]string
+	Data []byte
 }
 type SetAck struct {
 	Index uint64

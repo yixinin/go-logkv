@@ -17,15 +17,6 @@ func (s *Server) HandleRaft(sess cellnet.Session, msg interface{}) {
 		}
 	}()
 	switch msg := msg.(type) {
-	case *protocol.AddVoterReq:
-		ack := &protocol.AddVoterAck{}
-		resp = ack
-		f := s.raft.AddVoter(msg.ID, msg.ServerAddress, msg.PrevIndex, s.timeout)
-		if err := f.Error(); err != nil {
-			ack.Error = err
-			return
-		}
-		ack.Index = f.Index()
 	case *protocol.AddNonvoterReq:
 		ack := &protocol.AddNonvoterAck{}
 		resp = ack
@@ -35,6 +26,17 @@ func (s *Server) HandleRaft(sess cellnet.Session, msg interface{}) {
 			return
 		}
 		ack.Index = f.Index()
+
+	case *protocol.AddVoterReq:
+		ack := &protocol.AddVoterAck{}
+		resp = ack
+		f := s.raft.AddVoter(msg.ID, msg.ServerAddress, msg.PrevIndex, s.timeout)
+		if err := f.Error(); err != nil {
+			ack.Error = err
+			return
+		}
+		ack.Index = f.Index()
+
 	case *protocol.AppliedIndexReq:
 		index := s.raft.AppliedIndex()
 		resp = &protocol.AppliedIndexAck{Index: index}
