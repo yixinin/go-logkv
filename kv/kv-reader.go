@@ -3,8 +3,9 @@ package kv
 import (
 	"io"
 	bytesutils "logkv/bytes-utils"
-	"logkv/kvid"
 	"logkv/protocol"
+
+	"gopkg.in/mgo.v2/bson"
 )
 
 func ReadKvs(r io.Reader, set func(kv protocol.Kv)) error {
@@ -31,14 +32,14 @@ func ReadKv(r io.Reader) (int, protocol.Kv, error) {
 		return n, protocol.Kv{}, err
 	}
 
-	key := kvid.FromBytes(headerBuf[protocol.HeaderSize:])
+	key := bson.ObjectIdHex(string(headerBuf[protocol.HeaderSize:]))
 
 	var data = make([]byte, dataSize)
 	n1, err := r.Read(data)
 	if err != nil {
 		return n + n1, protocol.Kv{}, err
 	}
-	kv := protocol.KvFromKv(key, data)
+	kv := protocol.NewKv(key, data)
 
 	return n + n1, kv, err
 }

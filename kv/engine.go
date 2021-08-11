@@ -3,6 +3,7 @@ package kv
 import (
 	"bytes"
 	"io"
+	"logkv/protocol"
 	"os"
 	"sync"
 )
@@ -30,7 +31,14 @@ func NewKvEngine(filename string) *KvEngine {
 	if err != nil {
 		panic(err)
 	}
+	e.load()
 	return e
+}
+
+func (e *KvEngine) load() {
+	ReadKvs(e.fd, func(kv protocol.Kv) {
+		e.Set(kv)
+	})
 }
 
 func (e *KvEngine) rawFileReader() (io.Reader, error) {

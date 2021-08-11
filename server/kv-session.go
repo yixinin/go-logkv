@@ -6,6 +6,7 @@ import (
 
 	"github.com/davyxu/cellnet"
 	"github.com/davyxu/cellnet/peer"
+
 	"github.com/davyxu/cellnet/proc"
 )
 

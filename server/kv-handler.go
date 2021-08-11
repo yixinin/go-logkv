@@ -9,29 +9,58 @@ import (
 
 func (s *Server) Handle(sess cellnet.Session, msg interface{}) {
 	switch req := msg.(type) {
+	//set
 	case *protocol.SetReq:
-
-		f := s.raft.Apply(req.Data, s.timeout)
-		if err := f.Error(); err != nil {
-			log.Println(err)
-			return
+		var ack = protocol.SetAck{}
+		err := s.engine.Set(protocol.NewKv(req.Key, req.Data))
+		if err != nil {
+			ack.Code = 400
+			ack.Message = err.Error()
 		}
+		sess.Send(&ack)
 
-		switch resp := f.Response().(type) {
-		case error:
-			log.Println(resp)
-			return
-		case protocol.Kv:
-			s.RaftSync(&resp)
-			sess.Send(&resp)
-		default:
-			log.Println("unknown resp:", resp)
+	//get
+	case *protocol.GetReq:
+		var ack protocol.GetAck
+		v, err := s.engine.Get(req.Key)
+		if err != nil {
+			ack.Code = 400
+			ack.Message = err.Error()
 		}
+		ack.Data = v.Bytes()
+		sess.Send(&ack)
+	//delete
+	case *protocol.DeleteReq:
+		var ack protocol.DeleteAck
+		err := s.engine.Del(req.Time)
+		if err != nil {
+			ack.Code = 400
+			ack.Message = err.Error()
+		}
+		sess.Send(&ack)
+	//batchget
+	case *protocol.BatchGetReq:
+		var ack protocol.BatchGetAck
+		vs, err := s.engine.BatchGet(req.Keys)
+		if err != nil {
+			ack.Code = 400
+			ack.Message = err.Error()
+		}
+		ack.Datas = vs.Bytes()
+	//batchset
+	case *protocol.BatchSetReq:
+		var ack protocol.BatchSetAck
+		err := s.engine.BatchSet(req.Sets)
+		if err != nil {
+			ack.Code = 400
+			ack.Message = err.Error()
+		}
+		sess.Send(&ack)
+	//scan
+	case *protocol.ScanReq:
+
+	default:
+		log.Println("unkown msg", req)
+		return
 	}
-}
-
-func (s *Server) RaftSync(kv *protocol.Kv) {
-	s.ForeachRaftSession(func(sess cellnet.Session) {
-		sess.Send(kv)
-	})
 }

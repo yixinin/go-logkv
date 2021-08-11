@@ -2,13 +2,15 @@ package kv
 
 import (
 	"io"
-	"logkv/kvid"
 	"os"
+	"time"
+
+	"gopkg.in/mgo.v2/bson"
 )
 
 // 删除ts时间之前的数据  重建索引
-func (e *KvEngine) Del(ts uint32, index uint64) error {
-	var key = kvid.NewId(ts, index)
+func (e *KvEngine) Del(ts uint32) error {
+	var key = bson.NewObjectIdWithTime(time.Unix(int64(ts), 0))
 	offset, ok := e.indexer.GetMax(key)
 	if !ok {
 		return ErrNotFound

@@ -1,11 +1,12 @@
 package kv
 
 import (
-	"logkv/kvid"
-	"math"
 	"sync"
+	"time"
 
 	"logkv/skipmap"
+
+	"gopkg.in/mgo.v2/bson"
 )
 
 type KvIndexer struct {
@@ -19,7 +20,7 @@ func NewKvIndexer() *KvIndexer {
 	}
 }
 
-func (i *KvIndexer) Get(id kvid.Id) (int64, bool) {
+func (i *KvIndexer) Get(id bson.ObjectId) (int64, bool) {
 	i.RLock()
 	defer i.RUnlock()
 	node := i.i.FirstInRange(skipmap.Range{
@@ -32,12 +33,12 @@ func (i *KvIndexer) Get(id kvid.Id) (int64, bool) {
 	return node.Val(), true
 }
 
-func (i *KvIndexer) GetMin(key kvid.Id) (offset int64, ok bool) {
+func (i *KvIndexer) GetMin(key bson.ObjectId) (offset int64, ok bool) {
 	i.RLock()
 	defer i.RUnlock()
 	node := i.i.FirstInRange(skipmap.Range{
 		Min: key.Hex(),
-		Max: kvid.TsHex(math.MaxUint32),
+		Max: bson.NewObjectId().Hex(),
 	})
 
 	if node == nil {
@@ -46,21 +47,14 @@ func (i *KvIndexer) GetMin(key kvid.Id) (offset int64, ok bool) {
 	return node.Val(), true
 }
 
-func (i *KvIndexer) GetMax(key kvid.Id) (offset int64, ok bool) {
+func (i *KvIndexer) GetMax(key bson.ObjectId) (offset int64, ok bool) {
 	i.RLock()
 	defer i.RUnlock()
 
-	var max kvid.Id
-	if key.Index() == 0 {
-		max = kvid.NewId(key.Ts()+1, 0)
-	} else {
-		max = kvid.NewId(key.Ts(), key.Index()+1)
-	}
-
 	node := i.i.LastInRange(skipmap.Range{
-		Min:        key.Hex(),
-		Max:        max.Hex(),
-		ExcludeMax: true,
+		Min:        bson.NewObjectIdWithTime(time.Unix(0, 0)).Hex(),
+		Max:        key.Hex(),
+		ExcludeMin: true,
 	})
 	if node == nil {
 		return -1, false
@@ -68,7 +62,7 @@ func (i *KvIndexer) GetMax(key kvid.Id) (offset int64, ok bool) {
 	return node.Val(), true
 }
 
-func (i *KvIndexer) Set(id kvid.Id, offset int64) {
+func (i *KvIndexer) Set(id bson.ObjectId, offset int64) {
 	i.Lock()
 	defer i.Unlock()
 	i.i.Insert(id.Hex(), offset)
