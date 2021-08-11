@@ -7,7 +7,6 @@ import (
 	"github.com/davyxu/cellnet/codec"
 	_ "github.com/davyxu/cellnet/codec/binary"
 	"github.com/davyxu/cellnet/util"
-	"gopkg.in/mgo.v2/bson"
 )
 
 type CodeAck struct {
@@ -16,7 +15,7 @@ type CodeAck struct {
 }
 
 type SetReq struct {
-	Key  bson.ObjectId
+	Key  string
 	Data []byte
 }
 type SetAck struct {
@@ -32,7 +31,7 @@ type BatchSetAck struct {
 }
 
 type GetReq struct {
-	Key bson.ObjectId
+	Key string
 }
 
 type GetAck struct {
@@ -41,7 +40,7 @@ type GetAck struct {
 }
 
 type BatchGetReq struct {
-	Keys []bson.ObjectId
+	Keys []string
 }
 
 type BatchGetAck struct {

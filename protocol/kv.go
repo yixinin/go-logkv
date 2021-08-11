@@ -4,7 +4,7 @@ import (
 	"errors"
 	bytesutils "logkv/bytes-utils"
 
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 const (
@@ -13,11 +13,11 @@ const (
 )
 
 type Kv struct {
-	Key  bson.ObjectId
+	Key  primitive.ObjectID
 	Data []byte
 }
 
-func NewKv(key bson.ObjectId, data []byte) Kv {
+func NewKv(key primitive.ObjectID, data []byte) Kv {
 	return Kv{
 		Key:  key,
 		Data: data,
@@ -30,7 +30,8 @@ func KvFromBytes(buf []byte) (Kv, error) {
 		return Kv{}, err
 	}
 
-	var key = bson.ObjectIdHex(string(buf[HeaderSize : HeaderSize+KeySize]))
+	var key = primitive.NilObjectID
+	copy(key[:], buf[HeaderSize:HeaderSize+KeySize])
 	if err != nil {
 		return Kv{}, err
 	}

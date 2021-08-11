@@ -6,7 +6,7 @@ import (
 
 	"logkv/skipmap"
 
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type KvIndexer struct {
@@ -20,7 +20,7 @@ func NewKvIndexer() *KvIndexer {
 	}
 }
 
-func (i *KvIndexer) Get(id bson.ObjectId) (int64, bool) {
+func (i *KvIndexer) Get(id primitive.ObjectID) (int64, bool) {
 	i.RLock()
 	defer i.RUnlock()
 	node := i.i.FirstInRange(skipmap.Range{
@@ -33,12 +33,12 @@ func (i *KvIndexer) Get(id bson.ObjectId) (int64, bool) {
 	return node.Val(), true
 }
 
-func (i *KvIndexer) GetMin(key bson.ObjectId) (offset int64, ok bool) {
+func (i *KvIndexer) GetMin(key primitive.ObjectID) (offset int64, ok bool) {
 	i.RLock()
 	defer i.RUnlock()
 	node := i.i.FirstInRange(skipmap.Range{
 		Min: key.Hex(),
-		Max: bson.NewObjectId().Hex(),
+		Max: primitive.NewObjectID().Hex(),
 	})
 
 	if node == nil {
@@ -47,12 +47,12 @@ func (i *KvIndexer) GetMin(key bson.ObjectId) (offset int64, ok bool) {
 	return node.Val(), true
 }
 
-func (i *KvIndexer) GetMax(key bson.ObjectId) (offset int64, ok bool) {
+func (i *KvIndexer) GetMax(key primitive.ObjectID) (offset int64, ok bool) {
 	i.RLock()
 	defer i.RUnlock()
 
 	node := i.i.LastInRange(skipmap.Range{
-		Min:        bson.NewObjectIdWithTime(time.Unix(0, 0)).Hex(),
+		Min:        primitive.NewObjectIDFromTimestamp(time.Unix(0, 0)).Hex(),
 		Max:        key.Hex(),
 		ExcludeMin: true,
 	})
@@ -62,7 +62,7 @@ func (i *KvIndexer) GetMax(key bson.ObjectId) (offset int64, ok bool) {
 	return node.Val(), true
 }
 
-func (i *KvIndexer) Set(id bson.ObjectId, offset int64) {
+func (i *KvIndexer) Set(id primitive.ObjectID, offset int64) {
 	i.Lock()
 	defer i.Unlock()
 	i.i.Insert(id.Hex(), offset)

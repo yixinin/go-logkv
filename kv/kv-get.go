@@ -6,14 +6,14 @@ import (
 	bytesutils "logkv/bytes-utils"
 	"logkv/protocol"
 
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 var (
 	ErrNotFound = errors.New("not found")
 )
 
-func (e *KvEngine) Get(id bson.ObjectId) (protocol.Kv, error) {
+func (e *KvEngine) Get(id primitive.ObjectID) (protocol.Kv, error) {
 	offset, _ := e.indexer.Get(id)
 	return e.get(offset)
 }
@@ -36,7 +36,8 @@ func (e *KvEngine) get(offset int64) (protocol.Kv, error) {
 	if err != nil {
 		return protocol.Kv{}, err
 	}
-	key := bson.ObjectIdHex(string(headerBuf[protocol.HeaderSize:]))
+	var key primitive.ObjectID
+	copy(key[:], headerBuf[protocol.HeaderSize:])
 	if err != nil {
 		return protocol.Kv{}, err
 	}
@@ -49,7 +50,7 @@ func (e *KvEngine) get(offset int64) (protocol.Kv, error) {
 	return kv, nil
 }
 
-func (e *KvEngine) BatchGet(indexes []bson.ObjectId) (protocol.Kvs, error) {
+func (e *KvEngine) BatchGet(indexes []primitive.ObjectID) (protocol.Kvs, error) {
 	var kvs = make(protocol.Kvs, 0, len(indexes))
 	for _, index := range indexes {
 		kv, err := e.Get(index)
@@ -61,7 +62,7 @@ func (e *KvEngine) BatchGet(indexes []bson.ObjectId) (protocol.Kvs, error) {
 	return kvs, nil
 }
 
-func (e *KvEngine) Scan(startIndex, endIndex bson.ObjectId, limits ...int) (protocol.Kvs, error) {
+func (e *KvEngine) Scan(startIndex, endIndex primitive.ObjectID, limits ...int) (protocol.Kvs, error) {
 	var limit = 10 * 1000
 	if len(limits) > 0 {
 		limit = limits[0]
@@ -71,7 +72,7 @@ func (e *KvEngine) Scan(startIndex, endIndex bson.ObjectId, limits ...int) (prot
 	return e.scan(offset, limit, endIndex, -1)
 }
 
-func (e *KvEngine) scan(offset int64, limit int, endIndex bson.ObjectId, max int) (protocol.Kvs, error) {
+func (e *KvEngine) scan(offset int64, limit int, endIndex primitive.ObjectID, max int) (protocol.Kvs, error) {
 	if offset == -1 {
 		return nil, ErrNotFound
 	}

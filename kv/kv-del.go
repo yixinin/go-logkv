@@ -5,12 +5,12 @@ import (
 	"os"
 	"time"
 
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // 删除ts时间之前的数据  重建索引
 func (e *KvEngine) Del(ts uint32) error {
-	var key = bson.NewObjectIdWithTime(time.Unix(int64(ts), 0))
+	var key = primitive.NewObjectIDFromTimestamp(time.Unix(int64(ts), 0))
 	offset, ok := e.indexer.GetMax(key)
 	if !ok {
 		return ErrNotFound

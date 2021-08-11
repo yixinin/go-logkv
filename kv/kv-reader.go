@@ -5,7 +5,7 @@ import (
 	bytesutils "logkv/bytes-utils"
 	"logkv/protocol"
 
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func ReadKvs(r io.Reader, set func(kv protocol.Kv)) error {
@@ -32,7 +32,8 @@ func ReadKv(r io.Reader) (int, protocol.Kv, error) {
 		return n, protocol.Kv{}, err
 	}
 
-	key := bson.ObjectIdHex(string(headerBuf[protocol.HeaderSize:]))
+	var key primitive.ObjectID
+	copy(key[:], headerBuf[protocol.HeaderSize:])
 
 	var data = make([]byte, dataSize)
 	n1, err := r.Read(data)

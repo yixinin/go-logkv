@@ -12,7 +12,7 @@ import (
 	_ "github.com/davyxu/cellnet/peer/tcp"
 	"github.com/davyxu/cellnet/proc"
 	_ "github.com/davyxu/cellnet/proc/tcp"
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func main() {
@@ -64,17 +64,22 @@ func main() {
 		}).Session()
 		switch s[0] {
 		case "set":
-			key := bson.NewObjectId()
+			key := primitive.NewObjectID()
 			var req = protocol.SetReq{
-				Key:  key,
+				Key:  key.Hex(),
 				Data: []byte(s[1]),
 			}
 			sess.Send(req)
 			log.Println("set", key.Hex())
 		case "get":
-			key := bson.ObjectIdHex(s[1])
+			var key, err = primitive.ObjectIDFromHex(s[1])
+			if err != nil {
+				log.Println(err)
+				return
+			}
+
 			var req = protocol.GetReq{
-				Key: key,
+				Key: key.Hex(),
 			}
 			sess.Send(&req)
 		default:
