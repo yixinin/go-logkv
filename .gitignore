@@ -3,3 +3,4 @@ logkv
 client
 data
 *.kv
+log.kv

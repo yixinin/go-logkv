@@ -1,17 +1,19 @@
 package kv
 
 import (
+	"bytes"
 	"io"
 	bytesutils "logkv/bytes-utils"
 	"logkv/protocol"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/x/bsonx/bsoncore"
 )
 
-func ReadKvs(r io.Reader, set func(kv protocol.Kv, offset int64)) error {
+func ReadIndexes(r io.Reader, set func(key primitive.ObjectID, offset int64)) error {
 	var offset int64
 	for {
-		n, kv, err := ReadKv(r)
+		n, kv, _, err := ReadIndex(r)
 		if err != nil {
 			if err == io.EOF {
 				return nil
@@ -24,26 +26,27 @@ func ReadKvs(r io.Reader, set func(kv protocol.Kv, offset int64)) error {
 	}
 }
 
-func ReadKv(r io.Reader) (int, protocol.Kv, error) {
-	var headerBuf = make([]byte, protocol.HeaderSize+protocol.KeySize)
+func ReadIndex(r io.Reader) (int, primitive.ObjectID, []byte, error) {
+	var headerBuf = make([]byte, protocol.HeaderSize)
 	n, err := r.Read(headerBuf)
 	if err != nil {
-		return n, protocol.Kv{}, err
+		return n, primitive.NilObjectID, nil, err
 	}
-	dataSize, err := bytesutils.BytesToIntU(headerBuf[:protocol.HeaderSize])
+	dataSize, err := bytesutils.BytesToIntU(headerBuf)
 	if err != nil {
-		return n, protocol.Kv{}, err
+		return n, primitive.NilObjectID, nil, err
 	}
-
-	var key primitive.ObjectID
-	copy(key[:], headerBuf[protocol.HeaderSize:])
 
 	var data = make([]byte, dataSize)
 	n1, err := r.Read(data)
 	if err != nil {
-		return n + n1, protocol.Kv{}, err
+		return n + n1, primitive.NilObjectID, nil, err
 	}
-	kv := protocol.NewKv(key, data)
+	doc, err := bsoncore.NewDocumentFromReader(bytes.NewBuffer(data))
+	if err != nil {
+		return n + n1, primitive.NilObjectID, data, err
+	}
+	key := doc.Lookup("_id").ObjectID()
 
-	return n + n1, kv, err
+	return n + n1, key, data, err
 }

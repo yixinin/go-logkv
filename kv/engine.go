@@ -5,11 +5,12 @@ import (
 	"context"
 	"io"
 	"log"
-	"logkv/protocol"
 	"logkv/skipmap"
 	"os"
 	"sync"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type EngineMeta struct {
@@ -24,7 +25,7 @@ type KvEngine struct {
 
 	cache *skipmap.Skipmap
 
-	ch chan protocol.Kv
+	ch chan []byte
 }
 
 func (e *KvEngine) Close() {
@@ -44,7 +45,7 @@ func NewKvEngine(ctx context.Context, filename string) *KvEngine {
 		},
 		indexer: NewKvIndexer(),
 		cache:   skipmap.New(),
-		ch:      make(chan protocol.Kv, 1024*1024),
+		ch:      make(chan []byte, 1024*1024),
 	}
 	var err error
 	e.fd, err = os.OpenFile(filename, os.O_CREATE|os.O_RDWR|os.O_APPEND, os.ModeAppend|os.ModePerm)
@@ -58,8 +59,8 @@ func NewKvEngine(ctx context.Context, filename string) *KvEngine {
 }
 
 func (e *KvEngine) initIndexes() {
-	ReadKvs(e.fd, func(kv protocol.Kv, offset int64) {
-		e.indexer.Set(kv.Key, offset)
+	ReadIndexes(e.fd, func(key primitive.ObjectID, offset int64) {
+		e.indexer.Set(key, offset)
 	})
 }
 

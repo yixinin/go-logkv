@@ -13,6 +13,7 @@ import (
 	_ "github.com/davyxu/cellnet/peer/tcp"
 	"github.com/davyxu/cellnet/proc"
 	_ "github.com/davyxu/cellnet/proc/tcp"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -34,8 +35,9 @@ func main() {
 		case *protocol.SetAck:
 			log.Println(msg)
 		case *protocol.GetAck:
-			kv, _ := protocol.KvFromBytes(msg.Data)
-			fmt.Printf("key:%s,val:%s\n", kv.Key.Hex(), string(kv.Data))
+			var v Log
+			err := bson.Unmarshal(msg.Data, &v)
+			fmt.Println(v, err)
 		case *protocol.BatchGetAck:
 		case *protocol.BatchSetAck:
 		case *protocol.DeleteAck:
@@ -67,9 +69,18 @@ func main() {
 		switch s[0] {
 		case "set":
 			key := primitive.NewObjectID()
+			var v = Log{
+				Id:     key,
+				App:    "main",
+				Custom: s[1],
+			}
+			data, err := bson.Marshal(v)
+			if err != nil {
+				log.Println(err)
+				return
+			}
 			var req = protocol.SetReq{
-				Key:  key.Hex(),
-				Data: []byte(s[1]),
+				Data: data,
 			}
 			sess.Send(req)
 			log.Println("set", key.Hex())

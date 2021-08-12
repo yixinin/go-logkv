@@ -3,7 +3,6 @@ package kv
 import (
 	"context"
 	"log"
-	"logkv/protocol"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -30,12 +29,14 @@ func (e *KvEngine) flushTick(ctx context.Context) {
 func (e *KvEngine) flush() error {
 	// 将缓存的kv拷贝一份 然后写入磁盘
 	e.Lock()
-	var bucket = make(protocol.Kvs, 0, e.cache.Len())
+	var keys = make([]primitive.ObjectID, 0, e.cache.Len())
+	var bucket = make([][]byte, 0, e.cache.Len())
 	var iter = e.cache.ToIter()
 	for iter.HasNext() {
 		var node = iter.Next()
 		key, _ := primitive.ObjectIDFromHex(node.Key())
-		bucket = append(bucket, protocol.NewKv(key, node.Val().([]byte)))
+		keys = append(keys, key)
+		bucket = append(bucket, node.Val().([]byte))
 	}
 	e.Unlock()
 
@@ -43,17 +44,17 @@ func (e *KvEngine) flush() error {
 	if err != nil {
 		return err
 	}
-	for _, kv := range bucket {
-		n, err := e.fd.Write(kv.Bytes())
+	for i, data := range bucket {
+		n, err := e.fd.Write(data)
 		if err != nil {
 			return err
 		}
-		e.indexer.Set(kv.Key, offset)
+		e.indexer.Set(keys[i], offset)
 		offset += int64(n)
 	}
 	e.Lock()
-	for _, kv := range bucket {
-		e.cache.Delete(kv.Key.Hex())
+	for _, key := range keys {
+		e.cache.Delete(key.Hex())
 	}
 	e.Unlock()
 	return nil

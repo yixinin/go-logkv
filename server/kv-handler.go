@@ -14,13 +14,8 @@ func (s *Server) Handle(sess cellnet.Session, msg interface{}) {
 	case *protocol.SetReq:
 		var ack = &protocol.SetAck{}
 		defer sess.Send(ack)
-		key, err := primitive.ObjectIDFromHex(req.Key)
-		if err != nil {
-			ack.Code = 400
-			ack.Message = err.Error()
-			return
-		}
-		s.engine.Set(protocol.NewKv(key, req.Data))
+
+		s.engine.Set(req.Data)
 
 	//get
 	case *protocol.GetReq:
@@ -39,7 +34,7 @@ func (s *Server) Handle(sess cellnet.Session, msg interface{}) {
 			return
 		}
 
-		ack.Data = v.Bytes()
+		ack.Data = v
 
 	//delete
 	case *protocol.DeleteReq:
@@ -64,13 +59,7 @@ func (s *Server) Handle(sess cellnet.Session, msg interface{}) {
 		var ack = &protocol.BatchSetAck{}
 		defer sess.Send(ack)
 		for _, v := range req.Sets {
-			key, err := primitive.ObjectIDFromHex(v.Key)
-			if err != nil {
-				ack.Code = 400
-				ack.Message = err.Error()
-				break
-			}
-			s.engine.Set(protocol.NewKv(key, v.Data))
+			s.engine.Set(v)
 		}
 
 	//scan

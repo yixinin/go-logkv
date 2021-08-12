@@ -15,7 +15,6 @@ type CodeAck struct {
 }
 
 type SetReq struct {
-	Key  string
 	Data []byte
 }
 type SetAck struct {
@@ -23,7 +22,7 @@ type SetAck struct {
 }
 
 type BatchSetReq struct {
-	Sets []SetReq
+	Sets [][]byte
 }
 type BatchSetAck struct {
 	CodeAck
