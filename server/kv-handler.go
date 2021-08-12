@@ -12,32 +12,35 @@ func (s *Server) Handle(sess cellnet.Session, msg interface{}) {
 	switch req := msg.(type) {
 	//set
 	case *protocol.SetReq:
-		var ack = protocol.SetAck{}
+		var ack = &protocol.SetAck{}
+		defer sess.Send(ack)
 		key, err := primitive.ObjectIDFromHex(req.Key)
-		if err != nil {
-			panic(err)
-		}
-		err = s.engine.Set(protocol.NewKv(key, req.Data))
 		if err != nil {
 			ack.Code = 400
 			ack.Message = err.Error()
+			return
 		}
-		sess.Send(&ack)
+		s.engine.Set(protocol.NewKv(key, req.Data))
 
 	//get
 	case *protocol.GetReq:
 		var ack = &protocol.GetAck{}
+		defer sess.Send(ack)
 		key, err := primitive.ObjectIDFromHex(req.Key)
 		if err != nil {
-			panic(err)
+			ack.Code = 400
+			ack.Message = err.Error()
+			return
 		}
 		v, err := s.engine.Get(key)
 		if err != nil {
 			ack.Code = 400
 			ack.Message = err.Error()
+			return
 		}
+
 		ack.Data = v.Bytes()
-		sess.Send(ack)
+
 	//delete
 	case *protocol.DeleteReq:
 		var ack protocol.DeleteAck
@@ -58,13 +61,18 @@ func (s *Server) Handle(sess cellnet.Session, msg interface{}) {
 		// ack.Datas = vs.Bytes()
 	//batchset
 	case *protocol.BatchSetReq:
-		var ack protocol.BatchSetAck
-		err := s.engine.BatchSet(req.Sets)
-		if err != nil {
-			ack.Code = 400
-			ack.Message = err.Error()
+		var ack = &protocol.BatchSetAck{}
+		defer sess.Send(ack)
+		for _, v := range req.Sets {
+			key, err := primitive.ObjectIDFromHex(v.Key)
+			if err != nil {
+				ack.Code = 400
+				ack.Message = err.Error()
+				break
+			}
+			s.engine.Set(protocol.NewKv(key, v.Data))
 		}
-		sess.Send(&ack)
+
 	//scan
 	case *protocol.ScanReq:
 

@@ -53,5 +53,6 @@ func (s *Server) Listen(port int16) {
 		}
 	})
 	peerIns.Start()
-	queue.StartLoop().Wait()
+	s.tcpQueue = queue.StartLoop()
+	s.tcpQueue.Wait()
 }

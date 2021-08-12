@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"log"
 	"logkv/protocol"
 	"os"
@@ -33,7 +34,8 @@ func main() {
 		case *protocol.SetAck:
 			log.Println(msg)
 		case *protocol.GetAck:
-			log.Println(protocol.KvFromBytes(msg.Data))
+			kv, _ := protocol.KvFromBytes(msg.Data)
+			fmt.Printf("key:%s,val:%s\n", kv.Key.Hex(), string(kv.Data))
 		case *protocol.BatchGetAck:
 		case *protocol.BatchSetAck:
 		case *protocol.DeleteAck:
@@ -81,6 +83,7 @@ func main() {
 			var req = protocol.GetReq{
 				Key: key.Hex(),
 			}
+
 			sess.Send(&req)
 		default:
 			log.Println("unkown cmd")

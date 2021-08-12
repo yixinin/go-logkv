@@ -1,3 +1,5 @@
 *.exe
 logkv
+client
 data
+*.kv

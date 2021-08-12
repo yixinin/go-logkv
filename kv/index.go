@@ -30,7 +30,7 @@ func (i *KvIndexer) Get(id primitive.ObjectID) (int64, bool) {
 	if node == nil {
 		return -1, false
 	}
-	return node.Val(), true
+	return node.Val().(int64), true
 }
 
 func (i *KvIndexer) GetMin(key primitive.ObjectID) (offset int64, ok bool) {
@@ -44,7 +44,7 @@ func (i *KvIndexer) GetMin(key primitive.ObjectID) (offset int64, ok bool) {
 	if node == nil {
 		return -1, false
 	}
-	return node.Val(), true
+	return node.Val().(int64), true
 }
 
 func (i *KvIndexer) GetMax(key primitive.ObjectID) (offset int64, ok bool) {
@@ -59,13 +59,13 @@ func (i *KvIndexer) GetMax(key primitive.ObjectID) (offset int64, ok bool) {
 	if node == nil {
 		return -1, false
 	}
-	return node.Val(), true
+	return node.Val().(int64), true
 }
 
 func (i *KvIndexer) Set(id primitive.ObjectID, offset int64) {
 	i.Lock()
 	defer i.Unlock()
-	i.i.Insert(id.Hex(), offset)
+	i.i.Set(id.Hex(), offset)
 }
 
 func (i *KvIndexer) Clone() map[string]int64 {
@@ -75,7 +75,7 @@ func (i *KvIndexer) Clone() map[string]int64 {
 	var iter = i.i.ToIter()
 	for iter.HasNext() {
 		node := iter.Next()
-		m[node.Key()] = node.Val()
+		m[node.Key()] = node.Val().(int64)
 	}
 	return m
 }

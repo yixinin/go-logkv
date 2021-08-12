@@ -3,7 +3,7 @@ package skipmap
 import "fmt"
 
 type Node struct {
-	elem     int64
+	elem     interface{}
 	key      string
 	backward *Node
 	level    []skipLevel
@@ -16,7 +16,7 @@ type skipLevel struct {
 	span int
 }
 
-func newNode(maxLevel int, key string, elem int64) *Node {
+func newNode(maxLevel int, key string, elem interface{}) *Node {
 	return &Node{
 		elem:  elem,
 		key:   key,
@@ -29,9 +29,9 @@ func (node *Node) setLevel(l int) {
 }
 
 func (node *Node) Compare(other *Node) int {
-	if node.key < other.key || (node.key == other.key && node.elem < other.elem) {
+	if node.key < other.key {
 		return -1
-	} else if node.key > other.key || (node.key == other.key && node.elem > other.elem) {
+	} else if node.key > other.key {
 		return 1
 	} else {
 		return 0
@@ -62,6 +62,6 @@ func (node *Node) Key() string {
 	return node.key
 }
 
-func (node *Node) Val() int64 {
+func (node *Node) Val() interface{} {
 	return node.elem
 }

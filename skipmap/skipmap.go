@@ -42,12 +42,26 @@ func (m *Skipmap) String() string {
 	return fmt.Sprintf("<Skipmap level=%d, length=%d, tail=%s>", m.level, m.length, m.tail)
 }
 
-// Insert 向跳表中插入一个新的元素。
+func (m *Skipmap) Len() int {
+	return m.length
+}
+
+func (m *Skipmap) First() (*Node, bool) {
+	f := m.header.level[0].forward
+	return f, f != nil
+}
+
+func (m *Skipmap) Last() (*Node, bool) {
+	f := m.tail
+	return f, f != nil
+}
+
+// Set 向跳表中插入一个新的元素。
 // 步骤：
 // 1. 查找插入位置
 // 2. 创建新节点，并在目标位置插入节点
 // 3. 调整跳表 backward 指针等
-func (m *Skipmap) Insert(key string, elem int64) *Node {
+func (m *Skipmap) Set(key string, elem interface{}) *Node {
 	var (
 		// update 用于记录每层待更新的节点
 		update [MaxLevel]*Node
@@ -139,11 +153,11 @@ func (m *Skipmap) randomLevel() int {
 }
 
 // Delete 用于删除跳表中指定的节点。
-func (m *Skipmap) Delete(key string, elem int64) *Node {
+func (m *Skipmap) Delete(key string) *Node {
 	// 第一步，找到需要删除节点
 	var (
 		update     [MaxLevel]*Node
-		targetNode = &Node{elem: elem, key: key}
+		targetNode = &Node{key: key}
 	)
 
 	cur := m.header
@@ -163,6 +177,24 @@ func (m *Skipmap) Delete(key string, elem int64) *Node {
 
 	m.deleteNode(update, nodeToBeDeleted)
 	return nodeToBeDeleted
+}
+
+func (m *Skipmap) Get(key string) *Node {
+	var (
+		update     [MaxLevel]*Node
+		targetNode = &Node{key: key}
+	)
+
+	cur := m.header
+	for i := m.level - 1; i >= 0; i-- {
+		for cur.level[i].forward != nil && cur.level[i].forward.Lt(targetNode) {
+			cur = cur.level[i].forward
+		}
+		update[i] = cur
+	}
+
+	target := update[0].level[0].forward
+	return target
 }
 
 func (m *Skipmap) deleteNode(update [64]*Node, nodeToBeDeleted *Node) {
@@ -225,7 +257,7 @@ func (m *Skipmap) UpdateKey(curKey string, elem int64, newKey string) *Node {
 	} else {
 		// 需要删除旧节点，增加新节点
 		m.deleteNode(update, node)
-		return m.Insert(newKey, node.elem)
+		return m.Set(newKey, node.elem)
 	}
 }
 

@@ -8,16 +8,19 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func ReadKvs(r io.Reader, set func(kv protocol.Kv)) error {
+func ReadKvs(r io.Reader, set func(kv protocol.Kv, offset int64)) error {
+	var offset int64
 	for {
-		_, kv, err := ReadKv(r)
+		n, kv, err := ReadKv(r)
 		if err != nil {
 			if err == io.EOF {
 				return nil
 			}
 			return err
 		}
-		set(kv)
+
+		set(kv, offset)
+		offset += int64(n)
 	}
 }
 

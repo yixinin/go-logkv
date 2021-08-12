@@ -23,11 +23,10 @@ type SetAck struct {
 }
 
 type BatchSetReq struct {
-	Sets []Kv
+	Sets []SetReq
 }
 type BatchSetAck struct {
 	CodeAck
-	Index []uint64
 }
 
 type GetReq struct {
@@ -111,6 +110,12 @@ func init() {
 		Codec: codec.MustGetCodec("binary"),
 		Type:  reflect.TypeOf((*GetReq)(nil)).Elem(),
 		ID:    int(util.StringHash("proto.GetReq")),
+	})
+
+	cellnet.RegisterMessageMeta(&cellnet.MessageMeta{
+		Codec: codec.MustGetCodec("binary"),
+		Type:  reflect.TypeOf((*GetAck)(nil)).Elem(),
+		ID:    int(util.StringHash("proto.GetAck")),
 	})
 
 	cellnet.RegisterMessageMeta(&cellnet.MessageMeta{

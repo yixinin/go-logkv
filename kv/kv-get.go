@@ -14,6 +14,12 @@ var (
 )
 
 func (e *KvEngine) Get(id primitive.ObjectID) (protocol.Kv, error) {
+	// 先查询cache
+	node := e.cache.Get(id.Hex())
+	if node != nil {
+		data := node.Val().([]byte)
+		return protocol.NewKv(id, data), nil
+	}
 	offset, _ := e.indexer.Get(id)
 	return e.get(offset)
 }
