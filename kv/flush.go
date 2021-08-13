@@ -54,7 +54,7 @@ func (e *KvEngine) flush() error {
 	}
 	e.Lock()
 	for _, key := range keys {
-		e.cache.Delete(key.Hex())
+		e.cache.Del(key.Hex())
 	}
 	e.Unlock()
 	return nil

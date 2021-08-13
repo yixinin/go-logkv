@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"log"
 	"logkv/protocol"
@@ -18,6 +19,7 @@ import (
 )
 
 func main() {
+	var ctx, cancel = context.WithCancel(context.Background())
 	// 创建一个事件处理队列，整个客户端只有这一个队列处理事件，客户端属于单线程模型
 	queue := cellnet.NewEventQueue()
 
@@ -31,11 +33,17 @@ func main() {
 		case *cellnet.SessionConnected:
 			log.Println("client connected")
 		case *cellnet.SessionClosed:
+			cancel()
 			log.Println("client error")
+			return
+		case *cellnet.SessionConnectError:
+			cancel()
+			return
 		case *protocol.SetAck:
 			log.Println(msg)
 		case *protocol.GetAck:
-			var v Log
+			fmt.Printf("%d:%s,%s\n", msg.Code, msg.Message, msg.Data)
+			var v = map[string]interface{}{}
 			err := bson.Unmarshal(msg.Data, &v)
 			fmt.Println(v, err)
 		case *protocol.BatchGetAck:
@@ -53,10 +61,18 @@ func main() {
 	// 事件队列开始循环
 	queue.StartLoop()
 
-	log.Println("connected")
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				os.Exit(0)
+				return
+			}
+		}
+	}()
 
 	// 阻塞的从命令行获取聊天输入
-	ReadConsole(func(str string) {
+	ReadConsole(ctx, func(str string) {
 
 		s := strings.Split(str, " ")
 		if len(s) <= 1 {
@@ -72,7 +88,7 @@ func main() {
 			var v = Log{
 				Id:     key,
 				App:    "main",
-				Custom: s[1],
+				Custom: strings.Join(s[1:], " "),
 			}
 			data, err := bson.Marshal(v)
 			if err != nil {
@@ -97,15 +113,25 @@ func main() {
 
 			sess.Send(&req)
 		default:
-			log.Println("unkown cmd")
+			log.Println("unkown cmd", str)
 		}
 
 	})
 }
 
-func ReadConsole(callback func(string)) {
+func ReadCmd() {
+
+}
+
+func ReadConsole(ctx context.Context, callback func(string)) {
 
 	for {
+
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
 
 		// 从标准输入读取字符串，以\n为分割
 		text, err := bufio.NewReader(os.Stdin).ReadString('\n')

@@ -152,8 +152,8 @@ func (m *Skipmap) randomLevel() int {
 	return level
 }
 
-// Delete 用于删除跳表中指定的节点。
-func (m *Skipmap) Delete(key string) *Node {
+// Del 用于删除跳表中指定的节点。
+func (m *Skipmap) Del(key string) *Node {
 	// 第一步，找到需要删除节点
 	var (
 		update     [MaxLevel]*Node
@@ -194,6 +194,12 @@ func (m *Skipmap) Get(key string) *Node {
 	}
 
 	target := update[0].level[0].forward
+	if target == nil {
+		return nil
+	}
+	if target.Key() != key {
+		return nil
+	}
 	return target
 }
 
@@ -217,7 +223,7 @@ func (m *Skipmap) deleteNode(update [64]*Node, nodeToBeDeleted *Node) {
 		nodeToBeDeleted.level[0].forward.backward = nodeToBeDeleted.backward
 	}
 	// 调整层数
-	for m.header.level[m.level-1].forward == nil {
+	for m.level > 1 && m.header.level[m.level-1].forward == nil {
 		m.level--
 	}
 	// 减少节点计数

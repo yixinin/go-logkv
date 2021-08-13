@@ -59,9 +59,12 @@ func NewKvEngine(ctx context.Context, filename string) *KvEngine {
 }
 
 func (e *KvEngine) initIndexes() {
-	ReadIndexes(e.fd, func(key primitive.ObjectID, offset int64) {
+	err := ReadIndexes(e.fd, func(key primitive.ObjectID, offset int64) {
 		e.indexer.Set(key, offset)
 	})
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func (e *KvEngine) rawFileReader() (io.Reader, error) {

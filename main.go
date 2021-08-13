@@ -20,7 +20,7 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	var engine = kv.NewKvEngine(ctx, "log.kv")
+	var engine = kv.NewKvEngine(ctx, "sample.kv")
 
 	s := server.NewServer(ctx, engine)
 	go s.Run(int16(port))

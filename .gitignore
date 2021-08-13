@@ -4,3 +4,4 @@ client
 data
 *.kv
 log.kv
+.vscode/launch.json

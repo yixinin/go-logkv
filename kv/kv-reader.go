@@ -1,27 +1,29 @@
 package kv
 
 import (
-	"bytes"
+	"errors"
 	"io"
+	"log"
 	bytesutils "logkv/bytes-utils"
 	"logkv/protocol"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/x/bsonx/bsoncore"
 )
 
 func ReadIndexes(r io.Reader, set func(key primitive.ObjectID, offset int64)) error {
 	var offset int64
 	for {
-		n, kv, _, err := ReadIndex(r)
+		n, key, _, err := ReadIndex(r)
 		if err != nil {
 			if err == io.EOF {
 				return nil
 			}
 			return err
 		}
+		log.Println("load", key.Hex(), offset)
 
-		set(kv, offset)
+		set(key, offset)
 		offset += int64(n)
 	}
 }
@@ -38,15 +40,26 @@ func ReadIndex(r io.Reader) (int, primitive.ObjectID, []byte, error) {
 	}
 
 	var data = make([]byte, dataSize)
-	n1, err := r.Read(data)
+	n1, err := r.Read(data[4:])
 	if err != nil {
 		return n + n1, primitive.NilObjectID, nil, err
 	}
-	doc, err := bsoncore.NewDocumentFromReader(bytes.NewBuffer(data))
-	if err != nil {
-		return n + n1, primitive.NilObjectID, data, err
-	}
-	key := doc.Lookup("_id").ObjectID()
+	copy(data[:4], headerBuf)
+	// doc, err := bsoncore.NewDocumentFromReader(bytes.NewBuffer(buf))
+	// if err != nil {
+	// 	return n + n1, primitive.NilObjectID, data, err
+	// }
+	// _id := doc.Lookup("_id")
 
+	// key, ok := _id.ObjectIDOK()
+	var m = bson.M{}
+	err = bson.Unmarshal(data, &m)
+	if err != nil {
+		return n + n1, primitive.NilObjectID, nil, err
+	}
+	key, ok := m["_id"].(primitive.ObjectID)
+	if !ok {
+		return n + n1, primitive.NilObjectID, data, errors.New("not object id")
+	}
 	return n + n1, key, data, err
 }

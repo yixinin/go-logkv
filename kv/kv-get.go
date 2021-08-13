@@ -44,10 +44,11 @@ func (e *KvEngine) get(offset int64) ([]byte, error) {
 	}
 
 	var data = make([]byte, dataSize)
-	_, err = e.fd.Read(data)
+	_, err = e.fd.Read(data[4:])
 	if err != nil {
 		return nil, err
 	}
+	copy(data[:4], headerBuf)
 	return data, nil
 }
 

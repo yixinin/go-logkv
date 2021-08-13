@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"log"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/x/bsonx/bsoncore"
 )
@@ -28,8 +29,11 @@ func (e *KvEngine) receive() {
 		var key primitive.ObjectID
 		_id := doc.Lookup("_id")
 		if len(_id.Data) == 0 {
+			var m = bson.M{}
+			bson.Unmarshal(data, &m)
 			key = primitive.NewObjectID()
-			bsoncore.AppendObjectIDElement(data, "_id", key)
+			m["_id"] = key
+			data, _ = bson.Marshal(m)
 		} else {
 			key = _id.ObjectID()
 		}
