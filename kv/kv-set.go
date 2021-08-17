@@ -37,6 +37,6 @@ func (e *KvEngine) receive() {
 		} else {
 			key = _id.ObjectID()
 		}
-		e.cache.Set(key.Hex(), data)
+		e.cache.Set(key, data)
 	}
 }

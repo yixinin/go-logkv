@@ -1,10 +1,14 @@
 package skipmap
 
-import "fmt"
+import (
+	"fmt"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
 
 type Node struct {
 	elem     interface{}
-	key      string
+	key      [12]byte
 	backward *Node
 	level    []skipLevel
 }
@@ -16,7 +20,7 @@ type skipLevel struct {
 	span int
 }
 
-func newNode(maxLevel int, key string, elem interface{}) *Node {
+func newNode(maxLevel int, key primitive.ObjectID, elem interface{}) *Node {
 	return &Node{
 		elem:  elem,
 		key:   key,
@@ -29,13 +33,19 @@ func (node *Node) setLevel(l int) {
 }
 
 func (node *Node) Compare(other *Node) int {
-	if node.key < other.key {
-		return -1
-	} else if node.key > other.key {
-		return 1
-	} else {
-		return 0
+	return compareSlice(node.key, other.key)
+}
+
+func compareSlice(b1, b2 [12]byte) int {
+	for i := range b1 {
+		if b1[i] < b2[i] {
+			return -1
+		}
+		if b1[i] > b2[i] {
+			return 1
+		}
 	}
+	return 0
 }
 
 func (node *Node) Lt(other *Node) bool {
@@ -58,7 +68,7 @@ func (node *Node) String() string {
 	return fmt.Sprintf("<Node key=%s, elem='%d'>", node.key, node.elem)
 }
 
-func (node *Node) Key() string {
+func (node *Node) Key() primitive.ObjectID {
 	return node.key
 }
 

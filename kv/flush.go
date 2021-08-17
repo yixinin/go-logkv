@@ -34,8 +34,7 @@ func (e *KvEngine) flush() error {
 	var iter = e.cache.ToIter()
 	for iter.HasNext() {
 		var node = iter.Next()
-		key, _ := primitive.ObjectIDFromHex(node.Key())
-		keys = append(keys, key)
+		keys = append(keys, node.Key())
 		bucket = append(bucket, node.Val().([]byte))
 	}
 	e.Unlock()
@@ -54,7 +53,7 @@ func (e *KvEngine) flush() error {
 	}
 	e.Lock()
 	for _, key := range keys {
-		e.cache.Del(key.Hex())
+		e.cache.Del(key)
 	}
 	e.Unlock()
 	return nil

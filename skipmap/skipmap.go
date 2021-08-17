@@ -16,6 +16,8 @@ package skipmap
 import (
 	"fmt"
 	"math/rand"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 const (
@@ -33,7 +35,7 @@ func New() *Skipmap {
 	return &Skipmap{
 		level: 1,
 		// 头节点比较特殊，它有 64 层。头节点不会存储具体的元素信息
-		header: newNode(MaxLevel, "", -1),
+		header: newNode(MaxLevel, primitive.NilObjectID, -1),
 		tail:   nil,
 	}
 }
@@ -61,7 +63,7 @@ func (m *Skipmap) Last() (*Node, bool) {
 // 1. 查找插入位置
 // 2. 创建新节点，并在目标位置插入节点
 // 3. 调整跳表 backward 指针等
-func (m *Skipmap) Set(key string, elem interface{}) *Node {
+func (m *Skipmap) Set(key primitive.ObjectID, elem interface{}) *Node {
 	var (
 		// update 用于记录每层待更新的节点
 		update [MaxLevel]*Node
@@ -153,7 +155,7 @@ func (m *Skipmap) randomLevel() int {
 }
 
 // Del 用于删除跳表中指定的节点。
-func (m *Skipmap) Del(key string) *Node {
+func (m *Skipmap) Del(key primitive.ObjectID) *Node {
 	// 第一步，找到需要删除节点
 	var (
 		update     [MaxLevel]*Node
@@ -179,7 +181,7 @@ func (m *Skipmap) Del(key string) *Node {
 	return nodeToBeDeleted
 }
 
-func (m *Skipmap) Get(key string) *Node {
+func (m *Skipmap) Get(key primitive.ObjectID) *Node {
 	var (
 		update     [MaxLevel]*Node
 		targetNode = &Node{key: key}
@@ -237,7 +239,7 @@ func (m *Skipmap) deleteNode(update [64]*Node, nodeToBeDeleted *Node) {
 // 策略如下：
 // 1. 快速判断能否原节点修改，如果可以则直接修改并返回；
 // 2. 采用更加昂贵的操作：删除再添加。
-func (m *Skipmap) UpdateKey(curKey string, elem int64, newKey string) *Node {
+func (m *Skipmap) UpdateKey(curKey primitive.ObjectID, elem int64, newKey primitive.ObjectID) *Node {
 	var (
 		update     [MaxLevel]*Node
 		targetNode = &Node{elem: elem, key: curKey}
@@ -276,35 +278,36 @@ func (m *Skipmap) UpdateKey(curKey string, elem int64, newKey string) *Node {
 //    即：node->backward->key < newKey && node->level[0].forward == NULL
 // 4. node 是修改的后的分数恰好还能保证位于前一个和后一个节点分数之间
 //    即：node->backward->key < newkey && node->level[0].forward->key > newkey
-func (m *Skipmap) canUpdateKeyFor(node *Node, newKey string) bool {
-	if (node.backward == nil || node.backward.key < newKey) &&
-		(node.level[0].forward == nil || node.level[0].forward.key > newKey) {
+func (m *Skipmap) canUpdateKeyFor(node *Node, newKey primitive.ObjectID) bool {
+	if (node.backward == nil || compareSlice(node.backward.key, newKey) < 0) &&
+		(node.level[0].forward == nil || compareSlice(node.level[0].forward.key, newKey) > 0) {
 		return true
 	}
 	return false
 }
 
 type Range struct {
-	Min, Max               string
+	Min, Max               primitive.ObjectID
 	ExcludeMin, ExcludeMax bool
 }
 
-func (r *Range) GteMin(v string) bool {
+func (r *Range) GteMin(v primitive.ObjectID) bool {
 	if r.ExcludeMin {
-		return v > r.Min
+		return compareSlice(v, r.Min) > 0
 	}
-	return v >= r.Min
+	return compareSlice(v, r.Min) >= 0
 }
 
-func (r *Range) LteMax(v string) bool {
+func (r *Range) LteMax(v primitive.ObjectID) bool {
 	if r.ExcludeMax {
-		return v < r.Max
+		return compareSlice(v, r.Max) < 0
 	}
-	return v <= r.Max
+	return compareSlice(v, r.Min) <= 0
 }
 
 func (r *Range) isValid() bool {
-	if r.Min > r.Max {
+
+	if compareSlice(r.Min, r.Max) > 0 {
 		return false
 	}
 
@@ -382,7 +385,7 @@ func (m *Skipmap) isInRange(rng Range) bool {
 
 // Rank 返回一个节点的排名。
 // 注意，排名是从 1 开始计算的；如果 <key, elem> 未找到，则返回 0
-func (m *Skipmap) Rank(key string, elem int64) int {
+func (m *Skipmap) Rank(key primitive.ObjectID, elem int64) int {
 	rank := 0
 
 	target := &Node{key: key, elem: elem}

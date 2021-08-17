@@ -15,7 +15,7 @@ var (
 
 func (e *KvEngine) Get(id primitive.ObjectID) ([]byte, error) {
 	// 先查询cache
-	node := e.cache.Get(id.Hex())
+	node := e.cache.Get(id)
 	if node != nil {
 		data := node.Val().([]byte)
 		return data, nil

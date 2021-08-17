@@ -23,7 +23,7 @@ func NewKvIndexer() *KvIndexer {
 func (i *KvIndexer) Get(id primitive.ObjectID) (int64, bool) {
 	i.RLock()
 	defer i.RUnlock()
-	node := i.i.Get(id.Hex())
+	node := i.i.Get(id)
 	if node != nil {
 		return node.Val().(int64), true
 	}
@@ -34,8 +34,8 @@ func (i *KvIndexer) GetMin(key primitive.ObjectID) (offset int64, ok bool) {
 	i.RLock()
 	defer i.RUnlock()
 	node := i.i.FirstInRange(skipmap.Range{
-		Min: key.Hex(),
-		Max: primitive.NewObjectID().Hex(),
+		Min: key,
+		Max: primitive.NewObjectID(),
 	})
 
 	if node == nil {
@@ -49,8 +49,8 @@ func (i *KvIndexer) GetMax(key primitive.ObjectID) (offset int64, ok bool) {
 	defer i.RUnlock()
 
 	node := i.i.LastInRange(skipmap.Range{
-		Min: primitive.NewObjectIDFromTimestamp(time.Unix(0, 0)).Hex(),
-		Max: key.Hex(),
+		Min: primitive.NewObjectIDFromTimestamp(time.Unix(0, 0)),
+		Max: key,
 	})
 	if node == nil {
 		return -1, false
@@ -61,13 +61,13 @@ func (i *KvIndexer) GetMax(key primitive.ObjectID) (offset int64, ok bool) {
 func (i *KvIndexer) Set(id primitive.ObjectID, offset int64) {
 	i.Lock()
 	defer i.Unlock()
-	i.i.Set(id.Hex(), offset)
+	i.i.Set(id, offset)
 }
 
-func (i *KvIndexer) Clone() map[string]int64 {
+func (i *KvIndexer) Clone() map[primitive.ObjectID]int64 {
 	i.RLock()
 	defer i.RUnlock()
-	var m = make(map[string]int64)
+	var m = make(map[primitive.ObjectID]int64)
 	var iter = i.i.ToIter()
 	for iter.HasNext() {
 		node := iter.Next()
