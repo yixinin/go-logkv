@@ -23,6 +23,8 @@ type KvEngine struct {
 	fd      *os.File
 	indexer *KvIndexer
 
+	traceKey string
+
 	cache *skipmap.Skipmap
 
 	ch chan []byte
@@ -59,8 +61,11 @@ func NewKvEngine(ctx context.Context, filename string) *KvEngine {
 }
 
 func (e *KvEngine) initIndexes() {
-	err := ReadIndexes(e.fd, func(key primitive.ObjectID, offset int64) {
+	err := ReadIndexes(e.fd, func(key primitive.ObjectID, trace string, offset int64) {
 		e.indexer.Set(key, offset)
+		if trace != "" {
+			e.indexer.SetTrace(trace, key)
+		}
 	})
 	if err != nil {
 		log.Println(err)

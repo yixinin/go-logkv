@@ -11,19 +11,21 @@ import (
 
 type KvIndexer struct {
 	sync.RWMutex
-	i *skipmap.Skipmap
+	pk    *skipmap.Skipmap
+	trace map[string][]primitive.ObjectID
 }
 
 func NewKvIndexer() *KvIndexer {
 	return &KvIndexer{
-		i: skipmap.New(),
+		pk:    skipmap.New(),
+		trace: make(map[string][]primitive.ObjectID),
 	}
 }
 
 func (i *KvIndexer) Get(id primitive.ObjectID) (int64, bool) {
 	i.RLock()
 	defer i.RUnlock()
-	node := i.i.Get(id)
+	node := i.pk.Get(id)
 	if node != nil {
 		return node.Val().(int64), true
 	}
@@ -33,7 +35,7 @@ func (i *KvIndexer) Get(id primitive.ObjectID) (int64, bool) {
 func (i *KvIndexer) GetMin(key primitive.ObjectID) (offset int64, ok bool) {
 	i.RLock()
 	defer i.RUnlock()
-	node := i.i.FirstInRange(skipmap.Range{
+	node := i.pk.FirstInRange(skipmap.Range{
 		Min: key,
 		Max: primitive.NewObjectID(),
 	})
@@ -48,7 +50,7 @@ func (i *KvIndexer) GetMax(key primitive.ObjectID) (offset int64, ok bool) {
 	i.RLock()
 	defer i.RUnlock()
 
-	node := i.i.LastInRange(skipmap.Range{
+	node := i.pk.LastInRange(skipmap.Range{
 		Min: primitive.NewObjectIDFromTimestamp(time.Unix(0, 0)),
 		Max: key,
 	})
@@ -61,19 +63,19 @@ func (i *KvIndexer) GetMax(key primitive.ObjectID) (offset int64, ok bool) {
 func (i *KvIndexer) Set(id primitive.ObjectID, offset int64) {
 	i.Lock()
 	defer i.Unlock()
-	i.i.Set(id, offset)
+	i.pk.Set(id, offset)
 }
 
-func (i *KvIndexer) Clone() map[primitive.ObjectID]int64 {
+func (i *KvIndexer) SetTrace(trace string, ids ...primitive.ObjectID) {
+	i.Lock()
+	defer i.Unlock()
+	i.trace[trace] = append(i.trace[trace], ids...)
+}
+
+func (i *KvIndexer) GetTrace(trace string) []primitive.ObjectID {
 	i.RLock()
 	defer i.RUnlock()
-	var m = make(map[primitive.ObjectID]int64)
-	var iter = i.i.ToIter()
-	for iter.HasNext() {
-		node := iter.Next()
-		m[node.Key()] = node.Val().(int64)
-	}
-	return m
+	return i.trace[trace]
 }
 
 type Index struct {
