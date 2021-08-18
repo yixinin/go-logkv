@@ -61,7 +61,7 @@ func NewKvEngine(ctx context.Context, filename string) *KvEngine {
 }
 
 func (e *KvEngine) initIndexes() {
-	err := ReadIndexes(e.fd, func(key primitive.ObjectID, trace string, offset int64) {
+	err := ReadIndexes(e.fd, e.traceKey, func(key primitive.ObjectID, trace string, offset int64) {
 		e.indexer.Set(key, offset)
 		if trace != "" {
 			e.indexer.SetTrace(trace, key)

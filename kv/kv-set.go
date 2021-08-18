@@ -25,10 +25,13 @@ func (e *KvEngine) receive() {
 			continue
 		}
 		_id := doc.Lookup("_id").ObjectID()
-		trace := doc.Lookup("trace").String()
-		if trace != "" {
-			e.indexer.SetTrace(trace, _id)
+		if e.traceKey != "" {
+			trace := doc.Lookup(e.traceKey).String()
+			if trace != "" {
+				e.indexer.SetTrace(trace, _id)
+			}
 		}
+
 		e.cache.Set(_id, data)
 	}
 }
