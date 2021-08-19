@@ -87,7 +87,7 @@ func (e *KvEngine) scan(offset int64, limit int, endIndex primitive.ObjectID, ma
 	var readSize = 0
 	var kvs = make([][]byte, 0, limit)
 	for i := 0; i < limit; i++ {
-		n, key, _, data, err := ReadIndex(e.fd)
+		n, key, _, data, err := ReadIndex(e.fd, e.traceKey)
 		if err != nil {
 			if err == io.EOF {
 				return kvs, nil
